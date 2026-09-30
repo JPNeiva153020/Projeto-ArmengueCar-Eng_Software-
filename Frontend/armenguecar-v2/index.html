@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ArmengueCar — Gestão de Oficina</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/login.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
+  </head>
+  <body>
+    <div id="login" class="login-screen">
+      <div class="login-copy">
+        <div class="login-mark">AC</div>
+        <span class="eyebrow">ARMENGUECAR / OFICINA</span>
+        <h1>Do check-in à entrega.<br /><em>Sem perder o controle.</em></h1>
+        <p>Protótipo funcional para funilaria, pintura e reparo estrutural.</p>
+        <div class="login-flow"><b>01</b> Recepção <i>→</i><b>08</b> Entrega</div>
+      </div>
+      <form id="loginForm" class="login-card">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <strong>Armengue<span>Car</span></strong
+            ><small>gestão de oficina</small>
+          </div>
+        </div>
+        <h2>Acessar sistema</h2>
+        <p class="muted">Escolha um perfil para simular a autenticação.</p>
+        <label
+          >Perfil<select id="loginRole">
+            <option value="gerente">Cristina Ferraz — Gerente / Dona</option>
+            <option value="mecanico">Marcos Andrade — Mecânico / Funileiro</option>
+            <option value="cliente">Eduardo Ramos — Cliente</option>
+            <option value="admin">Paula Menezes — Administradora</option>
+          </select></label
+        ><label>Senha<input type="password" value="1234" /></label
+        ><button class="btn primary full">Entrar no ArmengueCar ↗</button>
+        <div class="demo-note">DEMO · senha: <b>1234</b></div>
+      </form>
+    </div>
+    <div class="app-shell hidden" id="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <strong>Armengue<span>Car</span></strong
+            ><small>gestão de oficina</small>
+          </div>
+        </div>
+        <div class="role-card">
+          <div class="avatar avatar-blue" id="roleAvatar">CF</div>
+          <div>
+            <strong id="currentUserName">Cristina Ferraz</strong><span id="currentUserRole">Gerente / Dona</span>
+          </div>
+          <button class="icon-btn" id="roleBtn">↕</button>
+        </div>
+        <nav class="nav" id="nav">
+          <button class="nav-item active" data-view="dashboard"><span>▦</span>Visão geral</button
+          ><button class="nav-item" data-view="kanban"><span>▤</span>Kanban</button
+          ><button class="nav-item" data-view="orders"><span>▣</span>Ordens de serviço</button
+          ><button class="nav-item" data-view="clients"><span>♙</span>Clientes e veículos</button
+          ><button class="nav-item" data-view="stock">
+            <span>◫</span>Estoque <b class="nav-count" id="stockCount">0</b></button
+          ><button class="nav-item" data-view="reports"><span>◒</span>Indicadores</button
+          ><button class="nav-item" data-view="notifications">
+            <span>◌</span>Notificações <b class="nav-count" id="notifCount">0</b></button
+          ><button class="nav-item" data-view="portal"><span>▱</span>Portal do cliente</button>
+          <div class="nav-sep"></div>
+          <button class="nav-item" data-view="users" data-role="admin"><span>♙</span>Usuários</button
+          ><button class="nav-item" data-view="audit" data-role="admin"><span>⌁</span>Auditoria</button
+          ><button class="nav-item" data-view="settings"><span>⚙</span>Configurações</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="status-dot"><i></i>Sistema operacional</div>
+          <button class="logout" id="logoutBtn">↪ Sair</button>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <button class="mobile-menu" id="mobileMenu">☰</button>
+          <div class="breadcrumbs"><span>ArmengueCar</span><b>/</b><strong id="pageTitle">Visão geral</strong></div>
+          <div class="top-actions"><button class="top-icon" id="searchBtn">⌕</button></div>
+        </header>
+        <section class="content" id="app"></section>
+      </main>
+    </div>
+    <div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modal"></div></div>
+    <div class="toast hidden" id="toast"></div>
+    <script src="js/utils.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/views.js"></script>
+    <script src="js/order-detail.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/actions.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

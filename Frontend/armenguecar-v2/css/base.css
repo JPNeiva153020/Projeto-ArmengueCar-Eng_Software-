@@ -1,0 +1,54 @@
+/* ===== Variáveis globais ===== */
+:root {
+  --navy: #111a3a;
+  --royal: #4b57e8;
+  --royal2: #6873ff;
+  --ice: #f5f7fb;
+  --ink: #18213d;
+  --slate: #667085;
+  --muted: #98a2b3;
+  --line: #e6e9f0;
+  --green: #168a5b;
+  --green-bg: #eaf8f1;
+  --amber: #b36a00;
+  --amber-bg: #fff5df;
+  --red: #c83f55;
+  --red-bg: #fff0f2;
+  --cyan: #087f9f;
+  --cyan-bg: #eaf8fc;
+  --shadow: 0 14px 40px rgba(22, 32, 72, .08);
+}
+
+/* ===== Reset básico ===== */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "DM Sans", sans-serif;
+  color: var(--ink);
+  background: var(--ice);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ===== Utilitários ===== */
+.muted {
+  color: var(--muted);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.full {
+  width: 100%;
+}
