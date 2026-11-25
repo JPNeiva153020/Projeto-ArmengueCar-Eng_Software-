@@ -12,7 +12,7 @@ Estado inicial verificado em 25/11/2026, commit c8bbe23: autenticação, consult
 | 4 | Orçamento por itens e versões, decisão do cliente | RF09–RF13 | Pendente |
 | 5 | Reserva por OS, indisponibilidade e reposição | RF14–RF17, RF24–RF25 | Pendente |
 | 6 | Execução, checklist, entrega e baixa idempotente | RF19–RF23 | Pendente |
-| 7 | Kanban, portal, fotos e notificações internas | RF18, RF26 | Pendente |
+| 7 | Kanban, portal, fotos e notificações internas | RF18, RF26 | Em andamento: Kanban conectado e consulta inicial de ordens do cliente; decisões, fotos e geração de notificações pendentes |
 | 8 | Indicadores, auditoria, qualidade e recuperação | RF27–RF29, RNF01–RNF15 | Pendente |
 
 Critério de conclusão por etapa: requisito rastreável, regras de negócio aplicadas na API, migração de dados existente quando necessária, testes de sucesso e falha e validação da interface. Atualizar esta tabela somente com base em evidências.
@@ -26,3 +26,5 @@ Restrição de escopo da revisão: integração externa de mensagens não está 
 25/11/2026: migração V5 vinculou as seis ordens existentes aos veículos. Duas placas já tinham mais de uma ordem não encerrada nos dados de demonstração; foram preservadas para revisão. Novas ordens verificam ordens não encerradas, inclusive prontas para entrega.
 
 25/11/2026: diagnóstico básico registra avarias, sintomas, observações e conclusão; elaboração de orçamento exige diagnóstico concluído. Os itens previstos, histórico completo e versionamento de orçamento continuam pendentes.
+
+25/11/2026: quadro Kanban conectado às ordens não encerradas, com oito etapas e filtro textual por ordem, veículo ou responsável; transições continuam pelas ações existentes na ordem.

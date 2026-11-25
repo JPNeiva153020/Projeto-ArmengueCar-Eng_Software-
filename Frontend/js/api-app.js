@@ -91,6 +91,27 @@ async function show(view) {
         <div class="integration-card">Ordens em andamento<h2>${data.activeOrders}</h2></div>
         <div class="integration-card">Total orçado<h2>${money(data.totalBudget)}</h2></div>
         <div class="integration-card">Itens em reposição<h2>${data.criticalStock}</h2></div></div>`;
+    } else if (view === "kanban") {
+      orders = await api("/orders");
+      const active = orders.filter((o) => !o.closedAt);
+      $("#app").innerHTML = `<h2>Kanban operacional</h2>
+        <label for="kanbanFilter">Pesquisar por ordem, veículo, placa ou responsável</label>
+        <input id="kanbanFilter" class="kanban-filter" type="search" placeholder="Pesquisar no quadro">
+        <div class="kanban-board">${Object.entries(labels).map(([stage, label]) => {
+          const column = active.filter((o) => o.stage === stage);
+          return `<section class="kanban-column"><h3>${escapeHtml(label)} · ${column.length}</h3>
+            ${column.map((o) => `<article class="kanban-card-real" data-kanban-card>
+              <strong>${escapeHtml(o.number)}</strong><p>${escapeHtml(o.plate)} · ${escapeHtml(o.vehicle)}</p>
+              <p>${escapeHtml(o.client.name)} · Resp.: ${escapeHtml(o.ownerInitials)}</p>
+              <button class="btn" data-action="order" data-id="${escapeHtml(o.id)}">Abrir ordem</button>
+            </article>`).join("") || '<p class="muted">Nenhuma ordem</p>'}</section>`;
+        }).join("")}</div>`;
+      $("#kanbanFilter").addEventListener("input", (event) => {
+        const query = event.target.value.trim().toLocaleLowerCase("pt-BR");
+        document.querySelectorAll("[data-kanban-card]").forEach((card) => {
+          card.hidden = !card.textContent.toLocaleLowerCase("pt-BR").includes(query);
+        });
+      });
     } else if (view === "orders") {
       [orders, vehicles] = await Promise.all([api("/orders"), api("/vehicles")]);
       $("#app").innerHTML = `<div class="integration-head"><h2>Ordens de serviço</h2><button class="btn primary" data-action="new-order">+ Nova ordem</button></div>

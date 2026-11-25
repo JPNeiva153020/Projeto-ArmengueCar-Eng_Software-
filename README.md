@@ -43,7 +43,7 @@ No perfil `demo`, as contas de demonstração incluem `cristina@armenguecar.loca
 
 ## Estado da integração
 
-Login, painel, listagem e cadastro de clientes e ordens, orçamento, decisão, avanço e retorno de etapas, checklist, consulta e movimentação de estoque, notificações e ativação de usuários usam a API. Os dados exibidos não são mais os dados locais simulados do protótipo.
+Login, painel, Kanban, listagem e cadastro de clientes e ordens, orçamento, decisão, avanço e retorno de etapas, checklist, consulta e movimentação de estoque, notificações e ativação de usuários usam a API. Os dados exibidos não são mais os dados locais simulados do protótipo.
 
 O portal inicial permite que uma conta de cliente consulte suas próprias ordens após vínculo explícito feito pela administradora em Clientes. Orçamentos, decisão do cliente e fotos ainda não estão disponíveis no portal. A API continua restringindo os endpoints operacionais aos perfis da equipe. Fotos reais, reserva e baixa automática de peças, registro definitivo de entrega, permissões finas, encerramento completo, itens previstos de diagnóstico, indicadores avançados e histórico auditável completo ainda precisam de implementação. O cadastro independente de veículos já está disponível. A administradora pode criar, editar, ativar, desativar e redefinir senhas de contas; mudanças de credenciais ou perfil invalidam sessões existentes. A interface anterior e suas simulações não são carregadas.
 
