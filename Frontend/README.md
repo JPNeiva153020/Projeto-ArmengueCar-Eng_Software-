@@ -1,7 +1,7 @@
-# ArmengueCar — Frontend
+# Interface ArmengueCar
 
-Protótipo navegável em HTML, CSS e JavaScript. Abra `index.html` em um navegador moderno.
+A interface em `index.html` usa `js/api-app.js` para chamar a API autenticada. Ela não usa os dados simulados do protótipo anterior. Inicie a API e sirva esta pasta por HTTP local; veja as instruções no README principal.
 
-Os dados e a escolha de perfil são simulados. Os dados ficam em `localStorage` no navegador, e fotos adicionadas ficam somente na sessão. O frontend ainda não chama a API do backend; não utilize para informações reais.
+Fotos, portal do cliente e reserva/baixa automática de peças ainda não estão disponíveis. Os demais arquivos JavaScript são mantidos como referência do protótipo anterior e não são carregados.
 
-Os estilos estão em `css/` e os scripts em `js/`. Os scripts compartilham estado global e são carregados na ordem definida em `index.html`; isso deve ser considerado ao separá-los em módulos.
+A interface anterior continua disponível em `prototipo.html` exclusivamente para consulta visual; ela usa dados simulados e não salva no PostgreSQL.

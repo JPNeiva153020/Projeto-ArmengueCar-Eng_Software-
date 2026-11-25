@@ -74,6 +74,12 @@ public class OrderService {
             throw new IllegalStateException("OS já está pronta para entrega");
         }
 
+        if (currentStage == OrderStage.DIAGNOSTICO && order.getValue() <= 0) {
+            throw new IllegalStateException("Informe um orçamento maior que zero antes de enviar para aprovação");
+        }
+        if (currentStage == OrderStage.CONTROLE_QUALIDADE) {
+            throw new IllegalStateException("Conclua o checklist para liberar a entrega");
+        }
         if (currentStage == OrderStage.AGUARDANDO_APROVACAO && !order.isApproved()) {
             throw new IllegalStateException("Orçamento ainda não aprovado");
         }
@@ -112,6 +118,9 @@ public class OrderService {
     public ServiceOrder decide(UUID id, DecisionRequest request) {
         ServiceOrder order = findOrder(id);
 
+        if (order.getStage() != OrderStage.AGUARDANDO_APROVACAO) {
+            throw new IllegalStateException("A decisão só pode ser registrada na etapa de aprovação");
+        }
         if (order.getValue() <= 0) {
             throw new IllegalStateException("Orçamento precisa ser maior que zero");
         }
@@ -138,6 +147,9 @@ public class OrderService {
         }
 
         ServiceOrder order = findOrder(id);
+        if (order.getStage() != OrderStage.CONTROLE_QUALIDADE) {
+            throw new IllegalStateException("Checklist disponível somente no controle de qualidade");
+        }
         String serializedChecklist = request.checklist().toString();
         boolean completed = request.checklist().stream().allMatch(Boolean::booleanValue);
 

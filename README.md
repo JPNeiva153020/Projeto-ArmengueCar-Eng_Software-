@@ -1,45 +1,50 @@
 # ArmengueCar
 
-Projeto acadêmico de gestão de oficina, com uma API Java e um protótipo de interface.
-
-> Estado atual: o frontend usa dados de demonstração no navegador e ainda não está conectado à API. Não use o projeto como sistema de produção.
+Sistema acadêmico de gestão de oficina, com frontend em HTML, CSS e JavaScript e API Spring Boot ligada ao PostgreSQL.
 
 ## Estrutura
 
-```text
-Backend/     API Spring Boot e testes
-Frontend/    interface estática, estilos e scripts
-```
+- `Backend/`: API, migrações Flyway e testes.
+- `Frontend/`: interface web e estilos. `js/api-app.js` é a interface integrada; os demais scripts são do protótipo anterior e não são carregados por `index.html`.
 
-## Backend
+## Preparar o PostgreSQL
 
-Requisitos: Java 17 e Maven 3.8 ou superior. Na pasta `Backend`:
+Crie um banco vazio chamado `armenguecar`, com usuário autorizado a criar tabelas. A API usa PostgreSQL por padrão e o Flyway cria a estrutura na primeira inicialização. Por padrão a conexão é `jdbc:postgresql://localhost:5432/armenguecar` com usuário `postgres`. Ajuste `DB_URL` e `DB_USER` se necessário. Informe a senha via variável de ambiente `DB_PASSWORD`; não a grave no repositório.
+
+## Executar a API
+
+Instale Java 17 e Maven. Em PowerShell, dentro de `Backend/`:
 
 ```powershell
-mvn test
+$env:DB_PASSWORD = Read-Host "Senha do PostgreSQL" -MaskInput
 mvn spring-boot:run
 ```
 
-O perfil padrão `postgres` usa PostgreSQL. Crie um banco chamado `armenguecar` e informe `DB_URL`, `DB_USER` e `DB_PASSWORD` no ambiente; a migração Flyway cria as tabelas. Para popular dados de demonstração em um banco vazio, ative também o perfil `demo`. O perfil `dev` usa H2 em arquivo, em `Backend/data/`. A API usa a porta 8080; `GET /api/health` é público. O login é feito em `POST /api/auth/login` com JSON contendo `email` e `password`; o token retornado é enviado como `Authorization: Bearer <token>`.
+O backend atende em `http://localhost:8080`. Para inserir usuários e dados **de demonstração** em um banco sem usuários, ative o perfil `demo` junto com `postgres`:
 
-Com o perfil `dev` ou `demo`, os usuários demonstrativos têm senha `1234`:
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.profiles=postgres,demo"
+```
 
-| Perfil | E-mail |
-| --- | --- |
-| Gerente | cristina@armenguecar.local |
-| Mecânico | marcos@armenguecar.local |
-| Cliente | eduardo@armenguecar.local |
-| Administrador | paula@armenguecar.local |
+O perfil `dev` usa H2 e dados de demonstração, útil para testes. Para executar os testes: `mvn test`.
 
-O perfil `postgres` utiliza `DB_URL`, `DB_USER` e `DB_PASSWORD` e executa migrações Flyway. Suas configurações e a segurança devem ser revisadas antes de qualquer uso real. A chave JWT e as credenciais padrão existentes são apenas de desenvolvimento.
+## Executar a interface
 
-## Frontend
+Com a API em execução, sirva a pasta `Frontend/` em um servidor HTTP local. Por exemplo, com Python instalado:
 
-Abra `Frontend/index.html` em um navegador moderno. Consulte [Frontend/README.md](Frontend/README.md). Login, troca de perfil e dados são simulados; alterações ficam no armazenamento local do navegador, não no banco da API.
+```powershell
+cd Frontend
+python -m http.server 5500 --bind 127.0.0.1
+```
 
-## Próximos passos
+Abra `http://127.0.0.1:5500`. A interface chama a API em `http://localhost:8080/api`. Não abra `index.html` diretamente como arquivo: a configuração CORS espera uma origem HTTP local.
 
-- Revisar regras de negócio, autorização por perfil e acesso aos dados de cada cliente.
-- Integrar autenticação e operações do frontend à API por etapas, com tratamento de erros.
-- Implementar e testar o armazenamento real de fotos e as regras de estoque e entrega.
-- Ampliar testes de integração e documentar contratos e implantação.
+No perfil `demo`, as contas de demonstração incluem `cristina@armenguecar.local` (gerente), `marcos@armenguecar.local` (mecânico) e `paula@armenguecar.local` (administradora), todas com senha `1234`. São exclusivamente para desenvolvimento.
+
+## Estado da integração
+
+Login, painel, listagem e cadastro de clientes e ordens, orçamento, decisão, avanço e retorno de etapas, checklist, consulta e movimentação de estoque, notificações e ativação de usuários usam a API. Os dados exibidos não são mais os dados locais simulados do protótipo.
+
+O portal de clientes permanece indisponível: ainda é necessário associar cada usuário cliente aos seus próprios registros e implementar autorização por propriedade. A API restringe ordens, clientes, estoque e painel aos perfis da equipe enquanto essa associação não existe. Fotos reais, reserva e baixa automática de peças, registro definitivo de entrega, criação de usuários, permissões finas, indicadores avançados e histórico auditável ainda precisam de implementação. A interface anterior e suas simulações não são carregadas.
+
+O projeto não está pronto para produção. Revise a autenticação, os perfis, as regras de negócio e os segredos antes de usá-lo com dados reais. Configure `JWT_SECRET` com uma chave forte; a chave padrão do projeto é apenas de desenvolvimento.
