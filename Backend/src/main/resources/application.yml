@@ -27,7 +27,7 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:h2:file:./data/armenguecar;MODE=PostgreSQL;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:./data/armenguecar;MODE=PostgreSQL;AUTO_SERVER=TRUE;NON_KEYWORDS=VALUE
     username: sa
     password:
     driver-class-name: org.h2.Driver
