@@ -28,3 +28,5 @@ Restrição de escopo da revisão: integração externa de mensagens não está 
 25/11/2026: diagnóstico básico registra avarias, sintomas, observações e conclusão; elaboração de orçamento exige diagnóstico concluído. Os itens previstos, histórico completo e versionamento de orçamento continuam pendentes.
 
 25/11/2026: quadro Kanban conectado às ordens não encerradas, com oito etapas e filtro textual por ordem, veículo ou responsável; transições continuam pelas ações existentes na ordem.
+
+25/11/2026: backup PostgreSQL restaurado em banco temporário; contagens de clientes, veículos, ordens e versão Flyway conferidas. A integridade completa dos dados e a rotina periódica de backup ainda exigem validação.
