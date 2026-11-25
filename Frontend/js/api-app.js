@@ -155,12 +155,21 @@ function orderDetail(id) {
     <div class="integration-actions"><button class="btn" data-action="order-patch" data-id="${id}" data-op="retreat">Voltar etapa</button>
     <button class="btn primary" data-action="order-patch" data-id="${id}" data-op="advance">Avançar etapa</button>
     <button class="btn" data-action="diagnosis" data-id="${id}">Diagnóstico</button>
+    <button class="btn" data-action="planned" data-id="${id}">Peças e serviços previstos</button>
     <button class="btn" data-action="budget" data-id="${id}">Orçamento</button>
     <button class="btn" data-action="decision" data-id="${id}" data-approved="true">Aprovar</button>
     <button class="btn" data-action="decision" data-id="${id}" data-approved="false">Recusar</button>
     <button class="btn" data-action="checklist" data-id="${id}">Checklist</button></div>
     <p class="integration-note">Fotos e baixa automática de peças ainda não estão disponíveis nesta integração.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
+}
+async function plannedItems(orderId) {
+  const [items, inventory] = await Promise.all([api("/orders/" + orderId + "/planned-items"), api("/stock")]);
+  stock = inventory;
+  $("#app").innerHTML = `<h2>Peças e serviços previstos</h2><p class="integration-note">Registrar previsões não reserva nem movimenta o estoque. Orçamento por itens e reserva ainda estão em implementação.</p>
+    <div class="integration-table"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Quantidade</th><th>Valor unitário</th><th></th></tr></thead><tbody>
+    ${items.map((x) => `<tr><td>${escapeHtml(x.itemType)}</td><td>${escapeHtml(x.description)}</td><td>${escapeHtml(x.quantity)}</td><td>${money(x.unitPrice)}</td><td><button class="btn" data-action="remove-planned" data-id="${escapeHtml(orderId)}" data-item="${escapeHtml(x.id)}">Remover</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item previsto.</td></tr>'}</tbody></table></div>
+    <div class="integration-actions"><button class="btn primary" data-action="add-planned" data-id="${escapeHtml(orderId)}">+ Adicionar item</button><button class="btn" data-action="order" data-id="${escapeHtml(orderId)}">Voltar à ordem</button></div>`;
 }
 $("#app").addEventListener("click", async (event) => {
   const b = event.target.closest("[data-action]"); if (!b) return;
@@ -188,6 +197,17 @@ $("#app").addEventListener("click", async (event) => {
       return form("Nova ordem de serviço", `<label>Veículo e proprietário<select name="vehicleId" required>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.plate)} · ${escapeHtml(v.model)} · ${escapeHtml(v.client.name)}</option>`).join("")}</select></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
     }
     if (action === "order") return orderDetail(id);
+    if (action === "planned") return await plannedItems(id);
+    if (action === "remove-planned") {
+      await api("/orders/" + id + "/planned-items/" + b.dataset.item, request("DELETE"));
+      return await plannedItems(id);
+    }
+    if (action === "add-planned") return form("Adicionar item previsto", `<input type="hidden" name="orderId" value="${escapeHtml(id)}">
+      <label>Tipo<select name="itemType"><option value="PECA">Peça</option><option value="MAO_DE_OBRA">Mão de obra</option></select></label>
+      <label>Peça cadastrada (somente para peça)<select name="stockItemId"><option value="">Selecione</option>${stock.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · saldo ${escapeHtml(s.quantity)} ${escapeHtml(s.unit)}</option>`).join("")}</select></label>
+      <label>Descrição (somente mão de obra)<input name="description" maxlength="255"></label>
+      <label>Quantidade<input name="quantity" type="number" min="0.01" step="0.01" required></label>
+      <label>Valor unitário previsto<input name="unitPrice" type="number" min="0" step="0.01" required></label>`, "planned-item");
     if (action === "diagnosis") {
       const d = await api("/orders/" + id + "/diagnosis") || {};
       return form("Diagnóstico", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Avarias<textarea name="damages" maxlength="2000">${escapeHtml(d.damages || "")}</textarea></label><label>Sintomas<textarea name="symptoms" maxlength="2000">${escapeHtml(d.symptoms || "")}</textarea></label><label>Observações técnicas<textarea name="observations" maxlength="2000">${escapeHtml(d.observations || "")}</textarea></label><label><span><input name="completed" type="checkbox" style="width:auto" ${d.completed ? "checked" : ""}> Diagnóstico concluído</span></label>`, "diagnosis");
@@ -216,6 +236,14 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "planned-item") {
+      await api("/orders/" + d.orderId + "/planned-items", request("POST", {
+        itemType: d.itemType, stockItemId: d.itemType === "PECA" ? (d.stockItemId || null) : null,
+        description: d.itemType === "MAO_DE_OBRA" ? d.description : null,
+        quantity: Number(d.quantity), unitPrice: Number(d.unitPrice),
+      }));
+      return await plannedItems(d.orderId);
+    }
     if (action === "diagnosis") await api("/orders/" + d.id + "/diagnosis", request("PUT", { damages: d.damages, symptoms: d.symptoms, observations: d.observations, completed: Boolean(d.completed) }));
     else if (action === "vehicle") await api("/vehicles" + (d.id ? "/" + d.id : ""), request(d.id ? "PUT" : "POST", { clientId: d.clientId, plate: d.plate, model: d.model, brand: d.brand, modelYear: d.modelYear ? Number(d.modelYear) : null }));
     else if (action === "link-client") await api("/clients/" + d.id + "/user", request("PATCH", { userId: d.userId || null }));
