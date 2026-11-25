@@ -23,7 +23,7 @@ public final class OrderDtos {
     }
 
     public record ChecklistRequest(
-            @NotNull List<Boolean> checklist
+            @NotNull List<@NotNull Boolean> checklist
     ) {
     }
 

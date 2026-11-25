@@ -43,14 +43,10 @@ No perfil `demo`, as contas de demonstração incluem `cristina@armenguecar.loca
 
 ## Estado da integração
 
-Login, painel, Kanban, listagem e cadastro de clientes e ordens, orçamento, decisão, avanço e retorno de etapas, checklist, consulta e movimentação de estoque, notificações e ativação de usuários usam a API. Os dados exibidos não são mais os dados locais simulados do protótipo.
+A interface usa a API para contas, clientes, veículos, ordens, diagnóstico, itens previstos, Kanban e estoque. O portal permite ao cliente vinculado consultar suas ordens e aprovar, recusar ou solicitar alterações em versões de orçamento. A aprovação reserva as peças disponíveis; após reposição, a equipe pode reavaliar a reserva. A entrega exige aprovação e checklist, registra o uso de peças e libera a reserva restante.
 
-O portal inicial permite que uma conta de cliente consulte suas próprias ordens após vínculo explícito feito pela administradora em Clientes. Orçamentos, decisão do cliente e fotos ainda não estão disponíveis no portal. A API continua restringindo os endpoints operacionais aos perfis da equipe. Fotos reais, reserva e baixa automática de peças, registro definitivo de entrega, permissões finas, encerramento completo, orçamento por itens e versões, indicadores avançados e histórico auditável completo ainda precisam de implementação. O cadastro independente de veículos já está disponível. A administradora pode criar, editar, ativar, desativar e redefinir senhas de contas; mudanças de credenciais ou perfil invalidam sessões existentes. A interface anterior e suas simulações não são carregadas.
+As ordens antigas de demonstração foram preservadas. Os indicadores históricos de aprovação ou reserva não criam um orçamento versionado nem reservas reais: revise essas ordens antes de prosseguir com elas. A integração externa com fornecedores não é necessária para a reposição manual.
+
+Ainda faltam funcionalidades dos requisitos, incluindo acompanhamento detalhado da execução, fotos reais, geração de notificações, histórico e indicadores completos, tratamento de retrabalho e revisão das permissões. Consulte [docs/BACKLOG.md](docs/BACKLOG.md) para o estado por etapa.
 
 O projeto não está pronto para produção. Revise a autenticação, os perfis, as regras de negócio e os segredos antes de usá-lo com dados reais. Configure `JWT_SECRET` com uma chave forte; a chave padrão do projeto é apenas de desenvolvimento.
-
-O plano rastreável por requisito está em [docs/BACKLOG.md](docs/BACKLOG.md).
-
-Novas ordens exigem selecionar um veículo cadastrado. A migração preserva os dados de ordens anteriores; vínculos que não puderem ser identificados permanecem pendentes para revisão.
-
-A OS em diagnóstico permite registrar avarias, sintomas e observações; concluir esses campos é necessário antes de informar o orçamento. Peças cadastradas e mão de obra podem ser incluídas como itens previstos, sem reservar nem baixar estoque. A integração desses itens ao orçamento ainda está pendente.

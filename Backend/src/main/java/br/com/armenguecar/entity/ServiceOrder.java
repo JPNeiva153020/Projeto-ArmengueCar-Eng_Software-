@@ -41,6 +41,11 @@ public class ServiceOrder {
 
     private Instant closedAt;
 
+    @Column(length = 30)
+    private String closedReason;
+
+    private UUID closedBy;
+
     @Column(nullable = false)
     private String plate;
 

@@ -83,7 +83,7 @@ async function show(view) {
   try {
     if (view === "portal") {
       const ownOrders = await api("/portal/orders");
-      $("#app").innerHTML = `<h2>Meus veículos</h2><p class="integration-note">O acompanhamento mostra apenas as ordens vinculadas à sua conta. Orçamentos e fotos ainda estão em desenvolvimento.</p>${ownOrders.map((o) => `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2><p>${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p><p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Progresso: ${Number(o.progress)}%</p></div>`).join("") || "<p>Nenhuma ordem vinculada à sua conta. Se precisar, procure a oficina.</p>"}`;
+      $("#app").innerHTML = `<h2>Meus veículos</h2><p class="integration-note">O acompanhamento mostra apenas as ordens vinculadas à sua conta. Fotos ainda estão em desenvolvimento.</p>${ownOrders.map((o) => `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2><p>${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p><p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Progresso: ${Number(o.progress)}%</p><button class="btn" data-action="portal-budgets" data-id="${escapeHtml(o.id)}">Ver orçamento</button></div>`).join("") || "<p>Nenhuma ordem vinculada à sua conta. Se precisar, procure a oficina.</p>"}`;
     } else if (view === "dashboard") {
       const data = await api("/dashboard");
       $("#app").innerHTML = `<h2>Visão geral</h2><div class="integration-grid">
@@ -132,8 +132,8 @@ async function show(view) {
     } else if (view === "stock") {
       stock = await api("/stock");
       $("#app").innerHTML = `<div class="integration-head"><h2>Estoque</h2><button class="btn primary" data-action="move-stock">+ Movimentar</button></div>
-        <div class="integration-table"><table><thead><tr><th>Item</th><th>Código</th><th>Saldo</th><th>Reposição</th><th></th></tr></thead><tbody>
-        ${stock.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.code)}</td><td>${s.quantity} ${escapeHtml(s.unit)}</td><td>${s.reorderPoint}</td><td><button class="btn" data-action="edit-stock" data-id="${escapeHtml(s.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item cadastrado.</td></tr>'}</tbody></table></div>`;
+        <div class="integration-table"><table><thead><tr><th>Item</th><th>Código</th><th>Saldo físico</th><th>Reservado</th><th>Disponível</th><th>Reposição</th><th></th></tr></thead><tbody>
+        ${stock.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.code)}</td><td>${s.quantity} ${escapeHtml(s.unit)}</td><td>${s.reservedQuantity}</td><td>${Math.max(0, s.quantity - s.reservedQuantity).toFixed(2)}</td><td>${s.reorderPoint}</td><td><button class="btn" data-action="edit-stock" data-id="${escapeHtml(s.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item cadastrado.</td></tr>'}</tbody></table></div>`;
     } else if (view === "notifications") {
       notifications = await api("/notifications");
       $("#app").innerHTML = `<div class="integration-head"><h2>Notificações</h2><button class="btn" data-action="read-all">Marcar todas como lidas</button></div>${notifications.map((n) => `<div class="integration-card"><strong>${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p><small>${n.read ? "Lida" : "Não lida"}</small> ${n.read ? "" : `<button class="btn" data-action="read" data-id="${escapeHtml(n.id)}">Marcar lida</button>`}</div>`).join("") || "<p>Nenhuma notificação.</p>"}`;
@@ -152,21 +152,32 @@ function orderDetail(id) {
   $("#app").innerHTML = `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2>
     <p>${escapeHtml(o.client.name)} · ${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p>
     <p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Orçamento: ${money(o.value)} · Aprovado: ${o.approved ? "Sim" : "Não"}</p>
-    <div class="integration-actions"><button class="btn" data-action="order-patch" data-id="${id}" data-op="retreat">Voltar etapa</button>
-    <button class="btn primary" data-action="order-patch" data-id="${id}" data-op="advance">Avançar etapa</button>
+    <div class="integration-actions"><button class="btn primary" data-action="order-patch" data-id="${id}" data-op="advance">Avançar etapa</button>
     <button class="btn" data-action="diagnosis" data-id="${id}">Diagnóstico</button>
     <button class="btn" data-action="planned" data-id="${id}">Peças e serviços previstos</button>
-    <button class="btn" data-action="budget" data-id="${id}">Orçamento</button>
-    <button class="btn" data-action="decision" data-id="${id}" data-approved="true">Aprovar</button>
-    <button class="btn" data-action="decision" data-id="${id}" data-approved="false">Recusar</button>
-    <button class="btn" data-action="checklist" data-id="${id}">Checklist</button></div>
-    <p class="integration-note">Fotos e baixa automática de peças ainda não estão disponíveis nesta integração.</p>
+    <button class="btn" data-action="budgets" data-id="${id}">Orçamentos</button>
+    ${o.stage === "AGUARDANDO_PECAS" ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
+    <button class="btn" data-action="checklist" data-id="${id}">Checklist</button>
+    ${o.stage === "PRONTO_ENTREGA" && !o.closedAt && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn primary" data-action="delivery" data-id="${id}">Confirmar entrega</button>` : ""}</div>
+    <p class="integration-note">Fotos reais e registro detalhado de etapas ainda estão em desenvolvimento.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
+}
+async function showBudgets(orderId, portal) {
+  const prefix = portal ? "/portal/orders/" : "/orders/";
+  const all = await api(prefix + orderId + "/budgets");
+  $("#app").innerHTML = `<div class="integration-head"><h2>Orçamentos</h2>${portal ? "" : `<button class="btn primary" data-action="publish-budget" data-id="${escapeHtml(orderId)}">Publicar nova versão</button>`}</div>
+    ${all.map((budget, index) => `<div class="integration-card"><h2>Versão ${budget.version} · ${escapeHtml(budget.status)}</h2>
+      <p>Total: ${money(budget.total)}</p><ul>${budget.items.map((line) => `<li>${escapeHtml(line.description)} · ${escapeHtml(line.quantity)} × ${money(line.unitPrice)}</li>`).join("")}</ul>
+      ${portal && index === 0 && budget.status === "PENDENTE" ? `<div class="integration-actions">
+        <button class="btn primary" data-action="portal-decision" data-id="${escapeHtml(orderId)}" data-budget="${escapeHtml(budget.id)}" data-decision="APROVAR">Aprovar</button>
+        <button class="btn" data-action="portal-decision" data-id="${escapeHtml(orderId)}" data-budget="${escapeHtml(budget.id)}" data-decision="RECUSAR">Recusar</button>
+        <button class="btn" data-action="portal-decision" data-id="${escapeHtml(orderId)}" data-budget="${escapeHtml(budget.id)}" data-decision="SOLICITAR_ALTERACAO">Solicitar alteração</button></div>` : ""}</div>`).join("") || "<p>Nenhuma versão publicada para esta ordem.</p>"}
+    <button class="btn" data-action="back">Voltar</button>`;
 }
 async function plannedItems(orderId) {
   const [items, inventory] = await Promise.all([api("/orders/" + orderId + "/planned-items"), api("/stock")]);
   stock = inventory;
-  $("#app").innerHTML = `<h2>Peças e serviços previstos</h2><p class="integration-note">Registrar previsões não reserva nem movimenta o estoque. Orçamento por itens e reserva ainda estão em implementação.</p>
+  $("#app").innerHTML = `<h2>Peças e serviços previstos</h2><p class="integration-note">Registrar previsões não reserva nem movimenta o estoque. A reserva ocorre após a aprovação do orçamento pelo cliente.</p>
     <div class="integration-table"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Quantidade</th><th>Valor unitário</th><th></th></tr></thead><tbody>
     ${items.map((x) => `<tr><td>${escapeHtml(x.itemType)}</td><td>${escapeHtml(x.description)}</td><td>${escapeHtml(x.quantity)}</td><td>${money(x.unitPrice)}</td><td><button class="btn" data-action="remove-planned" data-id="${escapeHtml(orderId)}" data-item="${escapeHtml(x.id)}">Remover</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item previsto.</td></tr>'}</tbody></table></div>
     <div class="integration-actions"><button class="btn primary" data-action="add-planned" data-id="${escapeHtml(orderId)}">+ Adicionar item</button><button class="btn" data-action="order" data-id="${escapeHtml(orderId)}">Voltar à ordem</button></div>`;
@@ -197,6 +208,26 @@ $("#app").addEventListener("click", async (event) => {
       return form("Nova ordem de serviço", `<label>Veículo e proprietário<select name="vehicleId" required>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.plate)} · ${escapeHtml(v.model)} · ${escapeHtml(v.client.name)}</option>`).join("")}</select></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
     }
     if (action === "order") return orderDetail(id);
+    if (action === "delivery") {
+      const reserved = await api("/orders/" + id + "/delivery");
+      return form("Confirmar entrega", `<input type="hidden" name="id" value="${escapeHtml(id)}"><p>Informe o uso efetivo de cada peça; o restante da reserva será liberado.</p>${reserved.map((r) => `<label>${escapeHtml(r.name)} · reservado: ${escapeHtml(r.reserved)} ${escapeHtml(r.unit)}<input type="number" name="used.${escapeHtml(r.itemId)}" value="${escapeHtml(r.reserved)}" min="0" max="${escapeHtml(r.reserved)}" step="0.01" required></label>`).join("") || "<p>Esta ordem não possui peças reservadas.</p>"}`, "delivery");
+    }
+    if (action === "budgets") return await showBudgets(id, false);
+    if (action === "portal-budgets") return await showBudgets(id, true);
+    if (action === "publish-budget") {
+      await api("/orders/" + id + "/budgets", request("POST"));
+      return await showBudgets(id, false);
+    }
+    if (action === "portal-decision") {
+      const message = { APROVAR: "Confirma a aprovação deste orçamento?", RECUSAR: "Confirma a recusa? A ordem será encerrada.", SOLICITAR_ALTERACAO: "Confirma a solicitação de alteração deste orçamento?" }[b.dataset.decision];
+      if (!message || !window.confirm(message)) return;
+      await api("/portal/orders/" + id + "/budgets/" + b.dataset.budget + "/decision", request("POST", { decision: b.dataset.decision }));
+      return await showBudgets(id, true);
+    }
+    if (action === "retry-reservation") {
+      await api("/orders/" + id + "/budgets/retry-reservation", request("POST"));
+      return await show(currentView);
+    }
     if (action === "planned") return await plannedItems(id);
     if (action === "remove-planned") {
       await api("/orders/" + id + "/planned-items/" + b.dataset.item, request("DELETE"));
@@ -236,6 +267,12 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "delivery") {
+      if (!window.confirm("Confirma a entrega e a baixa das quantidades informadas?")) return;
+      const items = [...f.querySelectorAll('[name^="used."]')].map((input) => ({ itemId: input.name.slice(5), usedQuantity: Number(input.value) }));
+      await api("/orders/" + d.id + "/delivery", request("POST", { items }));
+      return await show(currentView);
+    }
     if (action === "planned-item") {
       await api("/orders/" + d.orderId + "/planned-items", request("POST", {
         itemType: d.itemType, stockItemId: d.itemType === "PECA" ? (d.stockItemId || null) : null,

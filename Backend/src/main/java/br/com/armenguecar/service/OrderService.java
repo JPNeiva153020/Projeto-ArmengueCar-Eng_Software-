@@ -28,17 +28,20 @@ public class OrderService {
     private final ClientRepository clientRepository;
     private final br.com.armenguecar.repository.VehicleRepository vehicles;
     private final br.com.armenguecar.repository.DiagnosisRepository diagnoses;
+    private final br.com.armenguecar.repository.BudgetRepository budgets;
 
     public OrderService(
             ServiceOrderRepository orderRepository,
             ClientRepository clientRepository,
             br.com.armenguecar.repository.VehicleRepository vehicles,
-            br.com.armenguecar.repository.DiagnosisRepository diagnoses
+            br.com.armenguecar.repository.DiagnosisRepository diagnoses,
+            br.com.armenguecar.repository.BudgetRepository budgets
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
         this.vehicles = vehicles;
         this.diagnoses = diagnoses;
+        this.budgets = budgets;
     }
 
     @Transactional(readOnly = true)
@@ -74,83 +77,43 @@ public class OrderService {
 
     @Transactional
     public ServiceOrder advance(UUID id) {
-        ServiceOrder order = findOrder(id);
-        OrderStage currentStage = order.getStage();
-
-        if (currentStage == OrderStage.PRONTO_ENTREGA) {
-            throw new IllegalStateException("OS já está pronta para entrega");
+        ServiceOrder order = orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
+        if (order.getClosedAt() != null) throw new IllegalStateException("OS já encerrada");
+        switch (order.getStage()) {
+            case RECEPCAO_CHECKIN -> order.setStage(OrderStage.DIAGNOSTICO);
+            case AGUARDANDO_INICIO -> {
+                if (!order.isApproved() || !order.isReserved() || !hasApprovedBudget(id))
+                    throw new IllegalStateException("Aprovação e reservas completas são necessárias");
+                order.setStage(OrderStage.EXECUCAO);
+            }
+            case EXECUCAO -> {
+                if (!hasApprovedBudget(id)) throw new IllegalStateException("Orçamento aprovado não encontrado; revise esta ordem antiga");
+                order.setStage(OrderStage.CONTROLE_QUALIDADE);
+            }
+            case DIAGNOSTICO -> throw new IllegalStateException("Publique o orçamento por itens para solicitar aprovação");
+            case AGUARDANDO_APROVACAO -> throw new IllegalStateException("Aguardando decisão do cliente");
+            case AGUARDANDO_PECAS -> throw new IllegalStateException("Reavalie as reservas após a reposição");
+            case CONTROLE_QUALIDADE -> throw new IllegalStateException("Conclua o checklist para liberar a entrega");
+            case PRONTO_ENTREGA -> throw new IllegalStateException("OS já está pronta para entrega");
         }
-
-        if (currentStage == OrderStage.DIAGNOSTICO && !diagnoses.existsByOrderIdAndCompletedTrue(id)) {
-            throw new IllegalStateException("Conclua o diagnóstico antes de enviar o orçamento");
-        }
-        if (currentStage == OrderStage.DIAGNOSTICO && order.getValue() <= 0) {
-            throw new IllegalStateException("Informe um orçamento maior que zero antes de enviar para aprovação");
-        }
-        if (currentStage == OrderStage.CONTROLE_QUALIDADE) {
-            throw new IllegalStateException("Conclua o checklist para liberar a entrega");
-        }
-        if (currentStage == OrderStage.AGUARDANDO_APROVACAO && !order.isApproved()) {
-            throw new IllegalStateException("Orçamento ainda não aprovado");
-        }
-
-        OrderStage nextStage = OrderStage.values()[currentStage.ordinal() + 1];
-        order.setStage(nextStage);
-        order.setProgress(progressFor(nextStage));
-
+        order.setProgress(progressFor(order.getStage()));
         return orderRepository.save(order);
     }
 
     @Transactional
     public ServiceOrder retreat(UUID id) {
-        ServiceOrder order = findOrder(id);
-        OrderStage currentStage = order.getStage();
-
-        if (currentStage == OrderStage.RECEPCAO_CHECKIN) {
-            throw new IllegalStateException("OS já está na primeira etapa");
-        }
-
-        OrderStage previousStage = OrderStage.values()[currentStage.ordinal() - 1];
-        order.setStage(previousStage);
-        order.setProgress(progressFor(previousStage));
-
-        return orderRepository.save(order);
+        throw new IllegalStateException("Retorno manual indisponível; use o fluxo de retrabalho");
     }
 
     @Transactional
     public ServiceOrder updateBudget(UUID id, UpdateBudgetRequest request) {
-        ServiceOrder order = findOrder(id);
-        if (order.getClosedAt() != null || order.getStage() != OrderStage.DIAGNOSTICO
-                || !diagnoses.existsByOrderIdAndCompletedTrue(id))
-            throw new IllegalStateException("Conclua o diagnóstico antes de elaborar o orçamento");
-        order.setValue(request.value());
-        return orderRepository.save(order);
+        throw new IllegalStateException("Use o orçamento versionado por itens");
     }
 
     @Transactional
     public ServiceOrder decide(UUID id, DecisionRequest request) {
-        ServiceOrder order = findOrder(id);
-
-        if (order.getStage() != OrderStage.AGUARDANDO_APROVACAO) {
-            throw new IllegalStateException("A decisão só pode ser registrada na etapa de aprovação");
-        }
-        if (order.getValue() <= 0) {
-            throw new IllegalStateException("Orçamento precisa ser maior que zero");
-        }
-
-        order.setApproved(request.approved());
-
-        if (request.approved()) {
-            order.setStage(OrderStage.AGUARDANDO_INICIO);
-            order.setReserved(true);
-        } else {
-            order.setStage(OrderStage.RECEPCAO_CHECKIN);
-            order.setValue(0);
-            order.setReserved(false);
-        }
-
-        order.setProgress(progressFor(order.getStage()));
-        return orderRepository.save(order);
+        throw new IllegalStateException("A decisão deve ser registrada pelo cliente vinculado");
     }
 
     @Transactional
@@ -159,8 +122,9 @@ public class OrderService {
             throw new IllegalArgumentException("Checklist deve conter exatamente 5 itens");
         }
 
-        ServiceOrder order = findOrder(id);
-        if (order.getStage() != OrderStage.CONTROLE_QUALIDADE) {
+        ServiceOrder order = orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
+        if (order.getClosedAt() != null || order.getStage() != OrderStage.CONTROLE_QUALIDADE) {
             throw new IllegalStateException("Checklist disponível somente no controle de qualidade");
         }
         String serializedChecklist = request.checklist().toString();
@@ -178,25 +142,17 @@ public class OrderService {
 
     @Transactional
     public ServiceOrder deliver(UUID id) {
-        ServiceOrder order = findOrder(id);
-
-        if (order.getStage() != OrderStage.PRONTO_ENTREGA) {
-            throw new IllegalStateException("Entrega bloqueada: OS não está pronta");
-        }
-
-        if (!COMPLETE_CHECKLIST.equals(order.getChecklist())) {
-            throw new IllegalStateException("Entrega bloqueada: checklist pendente");
-        }
-
-        order.setReserved(false);
-        return orderRepository.save(order);
+        throw new IllegalStateException("Entrega indisponível até a baixa de peças ser implementada");
     }
 
     @Transactional
     public ServiceOrder addPhoto(UUID id) {
-        ServiceOrder order = findOrder(id);
-        order.setPhotos(order.getPhotos() + 1);
-        return orderRepository.save(order);
+        throw new IllegalStateException("Envio de fotos ainda não implementado");
+    }
+
+    private boolean hasApprovedBudget(UUID id) {
+        return budgets.findFirstByOrderIdOrderByVersionDesc(id)
+                .map(budget -> budget.getStatus().equals("APROVADO")).orElse(false);
     }
 
     private ServiceOrder findOrder(UUID id) {

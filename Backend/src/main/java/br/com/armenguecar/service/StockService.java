@@ -57,9 +57,11 @@ public class StockService {
 
     @Transactional
     public StockItem update(UUID id, UpdateStockRequest request) {
-        StockItem item = itemRepository.findById(id)
+        StockItem item = itemRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new EntityNotFoundException("Item não encontrado"));
 
+        if (request.quantity() < item.getReservedQuantity())
+            throw new IllegalArgumentException("Saldo não pode ser inferior às reservas existentes");
         item.setName(request.name().trim());
         item.setCode(request.code().trim().toUpperCase());
         item.setQuantity(request.quantity());
@@ -89,7 +91,7 @@ public class StockService {
     }
 
     private void validateMovement(StockItem item, MovementRequest request) {
-        if (request.type() == MovementType.SAIDA && item.getQuantity() < request.quantity()) {
+        if (request.type() == MovementType.SAIDA && item.getQuantity() - item.getReservedQuantity() < request.quantity()) {
             throw new IllegalStateException("Saldo insuficiente para realizar a saída");
         }
     }

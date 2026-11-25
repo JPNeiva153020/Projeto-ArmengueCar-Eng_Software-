@@ -61,14 +61,10 @@ class IntegratedFlowTest {
                         .content("{\"damages\":\"Porta amassada\",\"symptoms\":\"Ruído\",\"observations\":\"Inspeção\",\"completed\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.completed").value(true));
         mvc.perform(patch("/api/orders/{id}/budget", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"value\":200}")).andExpect(status().isOk());
-        mvc.perform(patch("/api/orders/{id}/advance", id).header("Authorization", auth)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.stage").value("AGUARDANDO_APROVACAO"));
-        mvc.perform(patch("/api/orders/{id}/decision", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"approved\":true}")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.stage").value("AGUARDANDO_INICIO"));
+                        .content("{\"value\":200}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/orders/{id}/budgets", id).header("Authorization", auth)).andExpect(status().isBadRequest());
         mvc.perform(get("/api/orders/{id}", id).header("Authorization", auth))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.approved").value(true));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("DIAGNOSTICO"));
     }
 
     @Test

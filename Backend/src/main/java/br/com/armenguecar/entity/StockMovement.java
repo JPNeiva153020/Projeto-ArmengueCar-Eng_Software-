@@ -48,4 +48,6 @@ public class StockMovement {
     @ManyToOne
     @JoinColumn(name = "created_by")
     private User createdBy;
+    @ManyToOne @JoinColumn(name = "order_id")
+    private ServiceOrder orderRef;
 }

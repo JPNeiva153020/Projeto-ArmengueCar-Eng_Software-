@@ -33,6 +33,9 @@ public class StockItem {
     private double quantity;
 
     @Column(nullable = false)
+    private double reservedQuantity;
+
+    @Column(nullable = false)
     private double reorderPoint;
 
     @Column(nullable = false)
