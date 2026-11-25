@@ -54,6 +54,13 @@ class IntegratedFlowTest {
                 .andExpect(jsonPath("$.stage").value("DIAGNOSTICO"));
         mvc.perform(patch("/api/orders/{id}/advance", id).header("Authorization", auth)).andExpect(status().isBadRequest());
         mvc.perform(patch("/api/orders/{id}/budget", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":200}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/orders/{id}/diagnosis", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"damages\":\"\",\"symptoms\":\"ruído\",\"completed\":true}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/orders/{id}/diagnosis", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"damages\":\"Porta amassada\",\"symptoms\":\"Ruído\",\"observations\":\"Inspeção\",\"completed\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completed").value(true));
+        mvc.perform(patch("/api/orders/{id}/budget", id).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":200}")).andExpect(status().isOk());
         mvc.perform(patch("/api/orders/{id}/advance", id).header("Authorization", auth)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("AGUARDANDO_APROVACAO"));

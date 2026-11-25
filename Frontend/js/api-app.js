@@ -133,6 +133,7 @@ function orderDetail(id) {
     <p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Orçamento: ${money(o.value)} · Aprovado: ${o.approved ? "Sim" : "Não"}</p>
     <div class="integration-actions"><button class="btn" data-action="order-patch" data-id="${id}" data-op="retreat">Voltar etapa</button>
     <button class="btn primary" data-action="order-patch" data-id="${id}" data-op="advance">Avançar etapa</button>
+    <button class="btn" data-action="diagnosis" data-id="${id}">Diagnóstico</button>
     <button class="btn" data-action="budget" data-id="${id}">Orçamento</button>
     <button class="btn" data-action="decision" data-id="${id}" data-approved="true">Aprovar</button>
     <button class="btn" data-action="decision" data-id="${id}" data-approved="false">Recusar</button>
@@ -166,6 +167,10 @@ $("#app").addEventListener("click", async (event) => {
       return form("Nova ordem de serviço", `<label>Veículo e proprietário<select name="vehicleId" required>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.plate)} · ${escapeHtml(v.model)} · ${escapeHtml(v.client.name)}</option>`).join("")}</select></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
     }
     if (action === "order") return orderDetail(id);
+    if (action === "diagnosis") {
+      const d = await api("/orders/" + id + "/diagnosis") || {};
+      return form("Diagnóstico", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Avarias<textarea name="damages" maxlength="2000">${escapeHtml(d.damages || "")}</textarea></label><label>Sintomas<textarea name="symptoms" maxlength="2000">${escapeHtml(d.symptoms || "")}</textarea></label><label>Observações técnicas<textarea name="observations" maxlength="2000">${escapeHtml(d.observations || "")}</textarea></label><label><span><input name="completed" type="checkbox" style="width:auto" ${d.completed ? "checked" : ""}> Diagnóstico concluído</span></label>`, "diagnosis");
+    }
     if (action === "order-patch") await api("/orders/" + id + "/" + b.dataset.op, request("PATCH"));
     else if (action === "decision") await api("/orders/" + id + "/decision", request("PATCH", { approved: b.dataset.approved === "true" }));
     else if (action === "budget") return form("Orçamento", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Valor<input type="number" name="value" min="0.01" step="0.01" required></label>`, "budget");
@@ -190,7 +195,8 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
-    if (action === "vehicle") await api("/vehicles" + (d.id ? "/" + d.id : ""), request(d.id ? "PUT" : "POST", { clientId: d.clientId, plate: d.plate, model: d.model, brand: d.brand, modelYear: d.modelYear ? Number(d.modelYear) : null }));
+    if (action === "diagnosis") await api("/orders/" + d.id + "/diagnosis", request("PUT", { damages: d.damages, symptoms: d.symptoms, observations: d.observations, completed: Boolean(d.completed) }));
+    else if (action === "vehicle") await api("/vehicles" + (d.id ? "/" + d.id : ""), request(d.id ? "PUT" : "POST", { clientId: d.clientId, plate: d.plate, model: d.model, brand: d.brand, modelYear: d.modelYear ? Number(d.modelYear) : null }));
     else if (action === "link-client") await api("/clients/" + d.id + "/user", request("PATCH", { userId: d.userId || null }));
     else if (action === "create-user") await api("/users", request("POST", d));
     else if (action === "update-user") await api("/users/" + d.id, request("PUT", { name: d.name, email: d.email, role: d.role }));

@@ -27,15 +27,18 @@ public class OrderService {
     private final ServiceOrderRepository orderRepository;
     private final ClientRepository clientRepository;
     private final br.com.armenguecar.repository.VehicleRepository vehicles;
+    private final br.com.armenguecar.repository.DiagnosisRepository diagnoses;
 
     public OrderService(
             ServiceOrderRepository orderRepository,
             ClientRepository clientRepository,
-            br.com.armenguecar.repository.VehicleRepository vehicles
+            br.com.armenguecar.repository.VehicleRepository vehicles,
+            br.com.armenguecar.repository.DiagnosisRepository diagnoses
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
         this.vehicles = vehicles;
+        this.diagnoses = diagnoses;
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +81,9 @@ public class OrderService {
             throw new IllegalStateException("OS já está pronta para entrega");
         }
 
+        if (currentStage == OrderStage.DIAGNOSTICO && !diagnoses.existsByOrderIdAndCompletedTrue(id)) {
+            throw new IllegalStateException("Conclua o diagnóstico antes de enviar o orçamento");
+        }
         if (currentStage == OrderStage.DIAGNOSTICO && order.getValue() <= 0) {
             throw new IllegalStateException("Informe um orçamento maior que zero antes de enviar para aprovação");
         }
@@ -114,6 +120,9 @@ public class OrderService {
     @Transactional
     public ServiceOrder updateBudget(UUID id, UpdateBudgetRequest request) {
         ServiceOrder order = findOrder(id);
+        if (order.getClosedAt() != null || order.getStage() != OrderStage.DIAGNOSTICO
+                || !diagnoses.existsByOrderIdAndCompletedTrue(id))
+            throw new IllegalStateException("Conclua o diagnóstico antes de elaborar o orçamento");
         order.setValue(request.value());
         return orderRepository.save(order);
     }
