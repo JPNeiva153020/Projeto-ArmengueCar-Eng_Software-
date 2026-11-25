@@ -35,6 +35,12 @@ public class ServiceOrder {
     @ManyToOne(optional = false)
     private Client client;
 
+    @ManyToOne
+    @jakarta.persistence.JoinColumn(name = "vehicle_id")
+    private Vehicle vehicleRef;
+
+    private Instant closedAt;
+
     @Column(nullable = false)
     private String plate;
 

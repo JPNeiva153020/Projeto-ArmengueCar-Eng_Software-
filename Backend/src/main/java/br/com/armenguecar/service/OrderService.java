@@ -26,13 +26,16 @@ public class OrderService {
 
     private final ServiceOrderRepository orderRepository;
     private final ClientRepository clientRepository;
+    private final br.com.armenguecar.repository.VehicleRepository vehicles;
 
     public OrderService(
             ServiceOrderRepository orderRepository,
-            ClientRepository clientRepository
+            ClientRepository clientRepository,
+            br.com.armenguecar.repository.VehicleRepository vehicles
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
+        this.vehicles = vehicles;
     }
 
     @Transactional(readOnly = true)
@@ -47,17 +50,18 @@ public class OrderService {
 
     @Transactional
     public ServiceOrder create(CreateOrderRequest request) {
-        Client client = clientRepository.findById(UUID.fromString(request.clientId()))
-                .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
-
-        String plate = normalizePlate(request.plate());
-        validateNoActiveOrder(plate);
+        var vehicle = vehicles.findByIdForUpdate(request.vehicleId())
+                .orElseThrow(() -> new EntityNotFoundException("Veículo não encontrado"));
+        Client client = vehicle.getClient();
+        String plate = normalizePlate(vehicle.getPlate());
+        validateNoActiveOrder(vehicle, plate);
 
         ServiceOrder order = new ServiceOrder();
         order.setNumber(generateNextNumber());
         order.setClient(client);
+        order.setVehicleRef(vehicle);
         order.setPlate(plate);
-        order.setVehicle(request.vehicle().trim());
+        order.setVehicle(vehicle.getModel());
         order.setProblem(request.problem().trim());
         order.setOwnerInitials(DEFAULT_OWNER);
         order.setProgress(INITIAL_PROGRESS);
@@ -191,10 +195,11 @@ public class OrderService {
                 .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
     }
 
-    private void validateNoActiveOrder(String plate) {
+    private void validateNoActiveOrder(br.com.armenguecar.entity.Vehicle vehicle, String plate) {
         boolean hasActiveOrder = orderRepository.findAll().stream()
-                .anyMatch(order -> plate.equalsIgnoreCase(order.getPlate())
-                        && order.getStage() != OrderStage.PRONTO_ENTREGA);
+                .anyMatch(order -> order.getClosedAt() == null
+                        && (plate.equalsIgnoreCase(order.getPlate())
+                        || (order.getVehicleRef() != null && vehicle.getId().equals(order.getVehicleRef().getId()))));
 
         if (hasActiveOrder) {
             throw new IllegalArgumentException("Veículo já possui OS ativa");

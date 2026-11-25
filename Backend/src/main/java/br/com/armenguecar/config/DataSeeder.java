@@ -44,6 +44,9 @@ public class DataSeeder {
                     });
             createStockItems(stockItems);
             createOrders(orders, clients);
+            orders.findAll().forEach(order -> vehicles.findByPlateIgnoreCase(order.getPlate())
+                    .filter(vehicle -> vehicle.getClient().getId().equals(order.getClient().getId()))
+                    .ifPresent(vehicle -> { order.setVehicleRef(vehicle); orders.save(order); }));
         };
     }
 

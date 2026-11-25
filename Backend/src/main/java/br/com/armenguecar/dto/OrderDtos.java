@@ -12,9 +12,7 @@ public final class OrderDtos {
     }
 
     public record CreateOrderRequest(
-            @NotBlank String clientId,
-            @NotBlank String plate,
-            @NotBlank String vehicle,
+            @NotNull java.util.UUID vehicleId,
             @NotBlank String problem
     ) {
     }

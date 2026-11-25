@@ -92,7 +92,7 @@ async function show(view) {
         <div class="integration-card">Total orçado<h2>${money(data.totalBudget)}</h2></div>
         <div class="integration-card">Itens em reposição<h2>${data.criticalStock}</h2></div></div>`;
     } else if (view === "orders") {
-      [orders, clients] = await Promise.all([api("/orders"), api("/clients")]);
+      [orders, vehicles] = await Promise.all([api("/orders"), api("/vehicles")]);
       $("#app").innerHTML = `<div class="integration-head"><h2>Ordens de serviço</h2><button class="btn primary" data-action="new-order">+ Nova ordem</button></div>
         <div class="integration-table"><table><thead><tr><th>Ordem</th><th>Cliente / veículo</th><th>Etapa</th><th>Valor</th><th></th></tr></thead><tbody>
         ${orders.map((o) => `<tr><td>${escapeHtml(o.number)}</td><td>${escapeHtml(o.client.name)}<br>${escapeHtml(o.vehicle)} · ${escapeHtml(o.plate)}</td><td>${escapeHtml(labels[o.stage] || o.stage)}</td><td>${money(o.value)}</td><td><button class="btn" data-action="order" data-id="${escapeHtml(o.id)}">Abrir</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhuma ordem cadastrada.</td></tr>'}
@@ -162,8 +162,8 @@ $("#app").addEventListener("click", async (event) => {
     if (action === "reset-password") return form("Redefinir senha", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Nova senha<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>`, "reset-password");
     if (action === "new-client") return form("Novo cliente", '<label>Nome<input name="name" required></label><label>Telefone<input name="phone" required></label><label>E-mail<input name="email" type="email"></label><label>Placa<input name="plate"></label><label>Veículo<input name="vehicle"></label>', "client");
     if (action === "new-order") {
-      if (!clients.length) throw new Error("Cadastre um cliente antes de criar uma ordem.");
-      return form("Nova ordem de serviço", `<label>Cliente<select name="clientId" required>${clients.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("")}</select></label><label>Placa<input name="plate" required></label><label>Veículo<input name="vehicle" required></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
+      if (!vehicles.length) throw new Error("Cadastre um veículo antes de criar uma ordem.");
+      return form("Nova ordem de serviço", `<label>Veículo e proprietário<select name="vehicleId" required>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.plate)} · ${escapeHtml(v.model)} · ${escapeHtml(v.client.name)}</option>`).join("")}</select></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
     }
     if (action === "order") return orderDetail(id);
     if (action === "order-patch") await api("/orders/" + id + "/" + b.dataset.op, request("PATCH"));

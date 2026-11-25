@@ -31,7 +31,7 @@ public class DashboardController {
         var orders = orderRepository.findAll();
 
         long activeOrders = orders.stream()
-                .filter(order -> order.getStage() != OrderStage.PRONTO_ENTREGA)
+                .filter(order -> order.getClosedAt() == null)
                 .count();
 
         double totalBudget = orders.stream()

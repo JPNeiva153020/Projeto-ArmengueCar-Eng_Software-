@@ -23,8 +23,9 @@ import java.util.UUID;
 public class VehicleController {
     private final VehicleRepository vehicles;
     private final ClientRepository clients;
-    public VehicleController(VehicleRepository vehicles, ClientRepository clients) {
-        this.vehicles = vehicles; this.clients = clients;
+    private final br.com.armenguecar.repository.ServiceOrderRepository orders;
+    public VehicleController(VehicleRepository vehicles, ClientRepository clients, br.com.armenguecar.repository.ServiceOrderRepository orders) {
+        this.vehicles = vehicles; this.clients = clients; this.orders = orders;
     }
     public record VehicleRequest(@NotNull UUID clientId, @NotBlank @Size(max=255) String plate,
                                  @NotBlank @Size(max=255) String model, @Size(max=255) String brand,
@@ -37,10 +38,13 @@ public class VehicleController {
     }
     @PutMapping("/{id}") @Transactional
     public Vehicle update(@PathVariable UUID id, @Valid @RequestBody VehicleRequest request) {
-        Vehicle v = vehicles.findById(id).orElseThrow(() -> new EntityNotFoundException("Veículo não encontrado"));
+        Vehicle v = vehicles.findByIdForUpdate(id).orElseThrow(() -> new EntityNotFoundException("Veículo não encontrado"));
         return save(v, request);
     }
     private Vehicle save(Vehicle vehicle, VehicleRequest request) {
+        if (vehicle.getId() != null && !vehicle.getClient().getId().equals(request.clientId())
+                && orders.existsByVehicleRefId(vehicle.getId()))
+            throw new IllegalArgumentException("Veículo com histórico de ordens não pode mudar de cliente");
         String plate = request.plate().trim().toUpperCase(Locale.ROOT);
         vehicles.findByPlateIgnoreCase(plate).filter(found -> !found.getId().equals(vehicle.getId()))
                 .ifPresent(found -> { throw new IllegalArgumentException("Placa já cadastrada"); });
