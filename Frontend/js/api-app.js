@@ -14,7 +14,7 @@ const labels = {
 let token = sessionStorage.getItem("armenguecar-token");
 let user = null;
 let currentView = "dashboard";
-let orders = [], clients = [], stock = [], notifications = [], users = [];
+let orders = [], clients = [], vehicles = [], stock = [], notifications = [], users = [];
 
 async function api(path, options = {}) {
   let response;
@@ -48,10 +48,13 @@ function logout() {
 }
 async function start() {
   user = await api("/me");
-  if (user.role === "CLIENTE") {
-    logout();
-    throw new Error("O portal do cliente ainda não está disponível. Use uma conta da equipe.");
-  }
+  const isClient = user.role === "CLIENTE";
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.hidden = isClient
+      ? !["portal", "notifications"].includes(button.dataset.view)
+      : button.dataset.view === "portal" || (button.dataset.view === "users" && user.role !== "ADMIN");
+  });
+  currentView = isClient ? "portal" : "dashboard";
   $("#login").classList.add("hidden"); $("#shell").classList.remove("hidden");
   $("#currentUser").textContent = user.name + " · " + user.role;
   document.querySelector('[data-view="users"]').hidden = user.role !== "ADMIN";
@@ -78,7 +81,10 @@ async function show(view) {
   document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-current", b.dataset.view === view ? "page" : "false"));
   $("#app").innerHTML = "<p>Carregando…</p>";
   try {
-    if (view === "dashboard") {
+    if (view === "portal") {
+      const ownOrders = await api("/portal/orders");
+      $("#app").innerHTML = `<h2>Meus veículos</h2><p class="integration-note">O acompanhamento mostra apenas as ordens vinculadas à sua conta. Orçamentos e fotos ainda estão em desenvolvimento.</p>${ownOrders.map((o) => `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2><p>${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p><p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Progresso: ${Number(o.progress)}%</p></div>`).join("") || "<p>Nenhuma ordem vinculada à sua conta. Se precisar, procure a oficina.</p>"}`;
+    } else if (view === "dashboard") {
       const data = await api("/dashboard");
       $("#app").innerHTML = `<h2>Visão geral</h2><div class="integration-grid">
         <div class="integration-card">Ordens totais<h2>${data.totalOrders}</h2></div>
@@ -93,9 +99,15 @@ async function show(view) {
         </tbody></table></div>`;
     } else if (view === "clients") {
       clients = await api("/clients");
+      if (user.role === "ADMIN") users = await api("/users");
       $("#app").innerHTML = `<div class="integration-head"><h2>Clientes</h2><button class="btn primary" data-action="new-client">+ Novo cliente</button></div>
-        <div class="integration-table"><table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Veículo / placa</th></tr></thead><tbody>
-        ${clients.map((c) => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email)}</td><td>${escapeHtml(c.vehicle)} · ${escapeHtml(c.plate)}</td></tr>`).join("") || '<tr><td colspan="4">Nenhum cliente cadastrado.</td></tr>'}</tbody></table></div>`;
+        <div class="integration-table"><table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Veículo / placa</th>${user.role === "ADMIN" ? "<th>Conta</th>" : ""}</tr></thead><tbody>
+        ${clients.map((c) => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email)}</td><td>${escapeHtml(c.vehicle)} · ${escapeHtml(c.plate)}</td>${user.role === "ADMIN" ? `<td>${c.userId ? "Vinculada" : "Sem vínculo"} <button class="btn" data-action="link-client" data-id="${escapeHtml(c.id)}">Alterar vínculo</button></td>` : ""}</tr>`).join("") || '<tr><td colspan="5">Nenhum cliente cadastrado.</td></tr>'}</tbody></table></div>`;
+    } else if (view === "vehicles") {
+      [vehicles, clients] = await Promise.all([api("/vehicles"), api("/clients")]);
+      $("#app").innerHTML = `<div class="integration-head"><h2>Veículos</h2><button class="btn primary" data-action="new-vehicle">+ Novo veículo</button></div>
+        <div class="integration-table"><table><thead><tr><th>Placa</th><th>Modelo</th><th>Marca / ano</th><th>Cliente</th><th></th></tr></thead><tbody>
+        ${vehicles.map((v) => `<tr><td>${escapeHtml(v.plate)}</td><td>${escapeHtml(v.model)}</td><td>${escapeHtml(v.brand)} ${escapeHtml(v.modelYear)}</td><td>${escapeHtml(v.client.name)}</td><td><button class="btn" data-action="edit-vehicle" data-id="${escapeHtml(v.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum veículo cadastrado.</td></tr>'}</tbody></table></div>`;
     } else if (view === "stock") {
       stock = await api("/stock");
       $("#app").innerHTML = `<div class="integration-head"><h2>Estoque</h2><button class="btn primary" data-action="move-stock">+ Movimentar</button></div>
@@ -106,7 +118,7 @@ async function show(view) {
       $("#app").innerHTML = `<div class="integration-head"><h2>Notificações</h2><button class="btn" data-action="read-all">Marcar todas como lidas</button></div>${notifications.map((n) => `<div class="integration-card"><strong>${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p><small>${n.read ? "Lida" : "Não lida"}</small> ${n.read ? "" : `<button class="btn" data-action="read" data-id="${escapeHtml(n.id)}">Marcar lida</button>`}</div>`).join("") || "<p>Nenhuma notificação.</p>"}`;
     } else if (view === "users" && user.role === "ADMIN") {
       users = await api("/users");
-      $("#app").innerHTML = `<h2>Usuários</h2><div class="integration-table"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>${users.map((u) => `<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.role)}</td><td>${u.active ? "Ativo" : "Inativo"}</td><td><button class="btn" data-action="toggle-user" data-id="${escapeHtml(u.id)}" ${u.id === user.id ? "disabled" : ""}>${u.active ? "Desativar" : "Ativar"}</button></td></tr>`).join("")}</tbody></table></div>`;
+      $("#app").innerHTML = `<div class="integration-head"><h2>Usuários</h2><button class="btn primary" data-action="new-user">+ Novo usuário</button></div><div class="integration-table"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>${users.map((u) => `<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.role)}</td><td>${u.active ? "Ativo" : "Inativo"}</td><td><button class="btn" data-action="edit-user" data-id="${escapeHtml(u.id)}">Editar</button> <button class="btn" data-action="reset-password" data-id="${escapeHtml(u.id)}">Redefinir senha</button> <button class="btn" data-action="toggle-user" data-id="${escapeHtml(u.id)}" ${u.id === user.id ? "disabled" : ""}>${u.active ? "Desativar" : "Ativar"}</button></td></tr>`).join("")}</tbody></table></div>`;
     }
   } catch (error) { $("#app").innerHTML = ""; showError(error); }
 }
@@ -133,6 +145,21 @@ $("#app").addEventListener("click", async (event) => {
   const action = b.dataset.action, id = b.dataset.id; $("#error").textContent = ""; b.disabled = true;
   try {
     if (action === "back") return await show(currentView);
+    if (action === "new-vehicle" || action === "edit-vehicle") {
+      const v = action === "edit-vehicle" ? vehicles.find((item) => item.id === id) : {};
+      if (!clients.length) throw new Error("Cadastre um cliente antes do veículo.");
+      return form(action === "new-vehicle" ? "Novo veículo" : "Editar veículo", `<input type="hidden" name="id" value="${escapeHtml(v.id || "")}"><label>Cliente<select name="clientId" required>${clients.map((c) => `<option value="${escapeHtml(c.id)}" ${v.client && v.client.id === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select></label><label>Placa<input name="plate" value="${escapeHtml(v.plate || "")}" required maxlength="255"></label><label>Modelo<input name="model" value="${escapeHtml(v.model || "")}" required maxlength="255"></label><label>Marca<input name="brand" value="${escapeHtml(v.brand || "")}" maxlength="255"></label><label>Ano<input name="modelYear" type="number" min="1886" max="2100" value="${escapeHtml(v.modelYear || "")}"></label>`, "vehicle");
+    }
+    if (action === "link-client") {
+      const c = clients.find((item) => item.id === id);
+      return form("Vincular conta ao cliente", `<p>Cliente: ${escapeHtml(c.name)}</p><input type="hidden" name="id" value="${escapeHtml(c.id)}"><label>Conta com perfil CLIENTE<select name="userId"><option value="">Sem conta vinculada</option>${users.filter((u) => u.role === "CLIENTE").map((u) => `<option value="${escapeHtml(u.id)}" ${u.id === c.userId ? "selected" : ""}>${escapeHtml(u.name)} · ${escapeHtml(u.email)}</option>`).join("")}</select></label>`, "link-client");
+    }
+    if (action === "new-user") return form("Novo usuário", '<label>Nome<input name="name" required maxlength="255"></label><label>E-mail<input name="email" type="email" required maxlength="255"></label><label>Senha inicial<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label><label>Perfil<select name="role"><option value="MECANICO">Mecânico</option><option value="GERENTE">Gerente</option><option value="ADMIN">Administrador</option><option value="CLIENTE">Cliente (portal inicial)</option></select></label>', "create-user");
+    if (action === "edit-user") {
+      const u = users.find((item) => item.id === id);
+      return form("Editar usuário", `<input type="hidden" name="id" value="${escapeHtml(u.id)}"><label>Nome<input name="name" value="${escapeHtml(u.name)}" required maxlength="255"></label><label>E-mail<input name="email" type="email" value="${escapeHtml(u.email)}" required maxlength="255"></label><label>Perfil<select name="role">${["MECANICO","GERENTE","ADMIN","CLIENTE"].map((role) => `<option value="${role}" ${u.role === role ? "selected" : ""}>${role}</option>`).join("")}</select></label>`, "update-user");
+    }
+    if (action === "reset-password") return form("Redefinir senha", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Nova senha<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>`, "reset-password");
     if (action === "new-client") return form("Novo cliente", '<label>Nome<input name="name" required></label><label>Telefone<input name="phone" required></label><label>E-mail<input name="email" type="email"></label><label>Placa<input name="plate"></label><label>Veículo<input name="vehicle"></label>', "client");
     if (action === "new-order") {
       if (!clients.length) throw new Error("Cadastre um cliente antes de criar uma ordem.");
@@ -163,7 +190,12 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
-    if (action === "client") await api("/clients", request("POST", d));
+    if (action === "vehicle") await api("/vehicles" + (d.id ? "/" + d.id : ""), request(d.id ? "PUT" : "POST", { clientId: d.clientId, plate: d.plate, model: d.model, brand: d.brand, modelYear: d.modelYear ? Number(d.modelYear) : null }));
+    else if (action === "link-client") await api("/clients/" + d.id + "/user", request("PATCH", { userId: d.userId || null }));
+    else if (action === "create-user") await api("/users", request("POST", d));
+    else if (action === "update-user") await api("/users/" + d.id, request("PUT", { name: d.name, email: d.email, role: d.role }));
+    else if (action === "reset-password") await api("/users/" + d.id + "/password", request("PATCH", { password: d.password }));
+    else if (action === "client") await api("/clients", request("POST", d));
     else if (action === "order") await api("/orders", request("POST", d));
     else if (action === "budget") await api("/orders/" + d.id + "/budget", request("PATCH", { value: Number(d.value) }));
     else if (action === "checklist") await api("/orders/" + d.id + "/checklist", request("PATCH", { checklist: [...f.querySelectorAll('[name="check"]')].map((x) => x.checked) }));

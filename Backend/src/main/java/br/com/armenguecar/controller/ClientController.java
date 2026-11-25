@@ -22,6 +22,17 @@ public class ClientController {
         this.clientService = clientService;
     }
 
+    public record LinkUserRequest(java.util.UUID userId) {}
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/user")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public Client linkUser(@org.springframework.web.bind.annotation.PathVariable java.util.UUID id,
+                           @RequestBody LinkUserRequest request,
+                           org.springframework.security.core.Authentication authentication) {
+        var actor = (br.com.armenguecar.entity.User) authentication.getPrincipal();
+        return clientService.linkUser(id, request.userId(), actor.getId());
+    }
+
     @GetMapping
     public List<Client> list() {
         return clientService.list();

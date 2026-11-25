@@ -47,6 +47,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             userRepository.findById(userId)
                     .filter(User::isActive)
+                    .filter(user -> user.getAuthVersion() == jwtService.extractAuthVersion(token))
                     .ifPresent(this::setAuthentication);
         } catch (RuntimeException ignored) {
             // Token inválido: a requisição seguirá sem autenticação e

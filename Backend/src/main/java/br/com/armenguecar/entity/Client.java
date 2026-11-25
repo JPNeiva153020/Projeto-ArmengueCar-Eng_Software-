@@ -32,4 +32,7 @@ public class Client {
     private String email;
     private String plate;
     private String vehicle;
+
+    @Column(name = "user_id", unique = true)
+    private UUID userId;
 }

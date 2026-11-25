@@ -24,6 +24,7 @@ public class DataSeeder {
     CommandLineRunner seed(
             UserRepository users,
             ClientRepository clients,
+            br.com.armenguecar.repository.VehicleRepository vehicles,
             StockItemRepository stockItems,
             ServiceOrderRepository orders,
             PasswordEncoder passwordEncoder
@@ -35,6 +36,12 @@ public class DataSeeder {
 
             createUsers(users, passwordEncoder);
             createClients(clients);
+            clients.findAll().stream().filter(client -> client.getPlate() != null && client.getVehicle() != null)
+                    .forEach(client -> {
+                        var vehicle = new br.com.armenguecar.entity.Vehicle();
+                        vehicle.setClient(client); vehicle.setPlate(client.getPlate()); vehicle.setModel(client.getVehicle());
+                        vehicles.save(vehicle);
+                    });
             createStockItems(stockItems);
             createOrders(orders, clients);
         };

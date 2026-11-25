@@ -44,6 +44,10 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    @JsonIgnore
+    @Column(nullable = false)
+    private long authVersion = 0;
+
     @Column(nullable = false, length = 2000)
     private String permissions = "{}";
 

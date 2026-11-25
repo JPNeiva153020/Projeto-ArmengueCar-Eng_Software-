@@ -24,7 +24,7 @@ public class JwtService {
         this.expirationMillis = expirationMillis;
     }
 
-    public String generate(UUID userId, String email, String role) {
+    public String generate(UUID userId, String email, String role, long authVersion) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationMillis);
 
@@ -32,10 +32,18 @@ public class JwtService {
                 .subject(userId.toString())
                 .claim("email", email)
                 .claim("role", role)
+                .claim("authVersion", authVersion)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(key)
                 .compact();
+    }
+
+    public long extractAuthVersion(String token) {
+        Number version = Jwts.parser().verifyWith(key).build().parseSignedClaims(token)
+                .getPayload().get("authVersion", Number.class);
+        if (version == null) throw new IllegalArgumentException("Token sem versão");
+        return version.longValue();
     }
 
     public UUID extractUserId(String token) {
