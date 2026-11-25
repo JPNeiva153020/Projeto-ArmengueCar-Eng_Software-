@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
-@Profile("dev")
+@Profile({"dev", "demo"})
 public class DataSeeder {
 
     @Bean

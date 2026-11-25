@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -45,5 +46,6 @@ public class StockMovement {
     private Instant createdAt = Instant.now();
 
     @ManyToOne
+    @JoinColumn(name = "created_by")
     private User createdBy;
 }

@@ -20,9 +20,9 @@ mvn test
 mvn spring-boot:run
 ```
 
-O perfil padrão `dev` usa H2 em arquivo, em `Backend/data/`, e popula dados de demonstração. A API usa a porta 8080; `GET /api/health` é público. O login é feito em `POST /api/auth/login` com JSON contendo `email` e `password`; o token retornado é enviado como `Authorization: Bearer <token>`.
+O perfil padrão `postgres` usa PostgreSQL. Crie um banco chamado `armenguecar` e informe `DB_URL`, `DB_USER` e `DB_PASSWORD` no ambiente; a migração Flyway cria as tabelas. Para popular dados de demonstração em um banco vazio, ative também o perfil `demo`. O perfil `dev` usa H2 em arquivo, em `Backend/data/`. A API usa a porta 8080; `GET /api/health` é público. O login é feito em `POST /api/auth/login` com JSON contendo `email` e `password`; o token retornado é enviado como `Authorization: Bearer <token>`.
 
-No perfil de desenvolvimento, os usuários demonstrativos têm senha `1234`:
+Com o perfil `dev` ou `demo`, os usuários demonstrativos têm senha `1234`:
 
 | Perfil | E-mail |
 | --- | --- |
