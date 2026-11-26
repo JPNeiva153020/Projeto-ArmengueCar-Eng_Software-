@@ -24,11 +24,12 @@ public class BudgetService {
     private final ClientRepository clients;
     private final UserRepository users;
     private final AuditService audit;
+    private final ExecutionStepRepository executionSteps;
     public BudgetService(ServiceOrderRepository orders, DiagnosisRepository diagnoses, PlannedItemRepository planned,
                          BudgetRepository budgets, BudgetLineRepository lines, PartReservationRepository reservations,
-                         StockItemRepository stock, ClientRepository clients, UserRepository users, AuditService audit) {
+                         StockItemRepository stock, ClientRepository clients, UserRepository users, AuditService audit, ExecutionStepRepository executionSteps) {
         this.orders=orders; this.diagnoses=diagnoses; this.planned=planned; this.budgets=budgets;
-        this.lines=lines; this.reservations=reservations; this.stock=stock; this.clients=clients; this.users=users; this.audit=audit;
+        this.lines=lines; this.reservations=reservations; this.stock=stock; this.clients=clients; this.users=users; this.audit=audit; this.executionSteps=executionSteps;
     }
     public record LineView(String type, String description, BigDecimal quantity, BigDecimal unitPrice) {}
     public record BudgetView(UUID id, int version, String status, BigDecimal total,
@@ -127,12 +128,47 @@ public class BudgetService {
         Budget budget=budgets.findFirstByOrderIdOrderByVersionDesc(orderId)
                 .filter(b -> b.getStatus().equals("APROVADO"))
                 .orElseThrow(() -> new IllegalStateException("Não há orçamento aprovado"));
+        if (order.getInterruptedStage()!=null)
+            throw new IllegalStateException("Confirme a regularização da falta de peças para retomar a execução");
         boolean complete=reserveAvailable(budget);
         order.setReserved(complete);
         if (complete) order.setStage(OrderStage.AGUARDANDO_INICIO);
         orders.save(order);
         audit.log(actorId,"RESERVAS_REAVALIADAS",orderId.toString(),complete ? "Completas" : "Pendentes");
         return view(budget);
+    }
+    @Transactional
+    public ServiceOrder blockForParts(UUID orderId, UUID actorId, String reason) {
+        ServiceOrder order=lockedOrder(orderId);
+        if (reason==null || reason.isBlank() || reason.length()>1000) throw new IllegalArgumentException("Informe o motivo da falta de peças");
+        if (order.getClosedAt()!=null || order.getStage()!=OrderStage.EXECUCAO || !order.isApproved() || !order.isReserved())
+            throw new IllegalStateException("A interrupção está disponível somente durante execução aprovada");
+        budgets.findFirstByOrderIdOrderByVersionDesc(orderId).filter(b->b.getStatus().equals("APROVADO"))
+                .orElseThrow(()->new IllegalStateException("Orçamento aprovado não encontrado"));
+        for (ExecutionStep step:executionSteps.findByOrderIdOrderByStartedAtAsc(orderId)) {
+            if (step.getStatus().equals("EM_ANDAMENTO")) {
+                Instant now=Instant.now();
+                step.setActiveMillis(step.getActiveMillis()+Math.max(0,java.time.Duration.between(step.getActiveSince(),now).toMillis()));
+                step.setActiveSince(null); step.setStatus("PAUSADA"); executionSteps.save(step);
+                audit.log(actorId,"ETAPA_PAUSADA_FALTA_PECA",orderId.toString(),step.getKind());
+            }
+        }
+        order.setInterruptedStage(OrderStage.EXECUCAO); order.setPartsBlockReason(reason.trim());
+        order.setStage(OrderStage.AGUARDANDO_PECAS); orders.save(order);
+        audit.log(actorId,"EXECUCAO_INTERROMPIDA_PECA",orderId.toString(),reason.trim());
+        return order;
+    }
+    @Transactional
+    public ServiceOrder resumeAfterParts(UUID orderId, UUID actorId) {
+        ServiceOrder order=lockedOrder(orderId);
+        if (order.getClosedAt()!=null || order.getStage()!=OrderStage.AGUARDANDO_PECAS || order.getInterruptedStage()!=OrderStage.EXECUCAO)
+            throw new IllegalStateException("A ordem não possui execução interrompida por peças");
+        Budget budget=budgets.findFirstByOrderIdOrderByVersionDesc(orderId).filter(b->b.getStatus().equals("APROVADO"))
+                .orElseThrow(()->new IllegalStateException("Orçamento aprovado não encontrado"));
+        if (!reserveAvailable(budget)) throw new IllegalStateException("As reservas do orçamento ainda estão incompletas");
+        order.setReserved(true); order.setStage(OrderStage.EXECUCAO); order.setInterruptedStage(null); order.setPartsBlockReason(null);
+        orders.save(order); audit.log(actorId,"EXECUCAO_LIBERADA_PECA",orderId.toString(),"Regularização confirmada; etapa permanece pausada até retomada manual");
+        return order;
     }
     private boolean reserveAvailable(Budget budget) {
         var pieces=lines.findByBudgetId(budget.getId()).stream().filter(x -> x.getStockItem()!=null)

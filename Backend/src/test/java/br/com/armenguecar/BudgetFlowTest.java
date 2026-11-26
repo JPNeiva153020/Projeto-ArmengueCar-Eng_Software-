@@ -86,6 +86,16 @@ class BudgetFlowTest {
         mvc.perform(get("/api/orders/{id}/execution-steps",f.orderId).header("Authorization",f.client))
                 .andExpect(status().isForbidden());
 
+        postJson("/api/orders/"+f.orderId+"/budgets/block-for-parts",f.staff,Map.of("reason","Aguardando substituição da peça"));
+        mvc.perform(get("/api/orders/{id}",f.orderId).header("Authorization",f.staff))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("AGUARDANDO_PECAS"))
+                .andExpect(jsonPath("$.interruptedStage").value("EXECUCAO"));
+        mvc.perform(post(stepPath+"/resume").header("Authorization",f.staff)).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/orders/{id}/budgets/retry-reservation",f.orderId).header("Authorization",f.staff)).andExpect(status().isBadRequest());
+        postJson("/api/orders/"+f.orderId+"/budgets/resume-after-parts",f.staff,Map.of());
+        mvc.perform(get("/api/orders/{id}/execution-steps",f.orderId).header("Authorization",f.staff))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PAUSADA"));
+        postJson(stepPath+"/resume",f.staff,Map.of());
         postJson(stepPath+"/pause",f.staff,Map.of());
         mvc.perform(post(stepPath+"/pause").header("Authorization",f.staff)).andExpect(status().isBadRequest());
         postJson(stepPath+"/resume",f.staff,Map.of());

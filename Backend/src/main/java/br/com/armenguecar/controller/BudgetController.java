@@ -21,4 +21,15 @@ public class BudgetController {
     public BudgetService.BudgetView retry(@PathVariable UUID orderId, Authentication auth) {
         return budgets.retryReservation(orderId, actor(auth));
     }
+    public record PartsBlockRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=1000) String reason) {}
+    @PostMapping("/block-for-parts")
+    @PreAuthorize("hasAnyRole('GERENTE','MECANICO','ADMIN')")
+    public br.com.armenguecar.entity.ServiceOrder block(@PathVariable UUID orderId, @jakarta.validation.Valid @RequestBody PartsBlockRequest request, Authentication auth) {
+        return budgets.blockForParts(orderId,actor(auth),request.reason());
+    }
+    @PostMapping("/resume-after-parts")
+    @PreAuthorize("hasAnyRole('GERENTE','ADMIN')")
+    public br.com.armenguecar.entity.ServiceOrder resume(@PathVariable UUID orderId, Authentication auth) {
+        return budgets.resumeAfterParts(orderId,actor(auth));
+    }
 }

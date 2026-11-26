@@ -156,11 +156,14 @@ function orderDetail(id) {
     <button class="btn" data-action="diagnosis" data-id="${id}">Diagnóstico</button>
     <button class="btn" data-action="planned" data-id="${id}">Peças e serviços previstos</button>
     <button class="btn" data-action="budgets" data-id="${id}">Orçamentos</button>
-    ${o.stage === "AGUARDANDO_PECAS" ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
+    ${o.stage === "EXECUCAO" && !o.closedAt ? `<button class="btn" data-action="block-parts" data-id="${id}">Interromper por falta de peças</button>` : ""}
+    ${o.stage === "AGUARDANDO_PECAS" && !o.interruptedStage ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
+    ${o.stage === "AGUARDANDO_PECAS" && o.interruptedStage && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn" data-action="resume-parts" data-id="${id}">Confirmar regularização</button>` : ""}
     ${o.stage === "EXECUCAO" ? `<button class="btn" data-action="execution" data-id="${id}">Etapas de execução</button>` : ""}
     <button class="btn" data-action="checklist" data-id="${id}">Checklist</button>
     ${o.stage === "CONTROLE_QUALIDADE" && !o.closedAt ? `<button class="btn" data-action="rework" data-id="${id}">Enviar para retrabalho</button>` : ""}
     ${o.stage === "PRONTO_ENTREGA" && !o.closedAt && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn primary" data-action="delivery" data-id="${id}">Confirmar entrega</button>` : ""}</div>
+    ${o.partsBlockReason ? `<p class="integration-note">Falta de peças: ${escapeHtml(o.partsBlockReason)}</p>` : ""}
     <p class="integration-note">Fotos reais e registro detalhado de etapas ainda estão em desenvolvimento.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
 }
@@ -228,6 +231,11 @@ $("#app").addEventListener("click", async (event) => {
     }
     if (action === "budgets") return await showBudgets(id, false);
     if (action === "rework") return form("Enviar para retrabalho", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Motivo<textarea name="reason" required maxlength="1000"></textarea></label>`, "rework");
+    if (action === "block-parts") return form("Interromper por falta de peças", `<input type="hidden" name="id" value="${escapeHtml(id)}"><p>Descreva o problema. Uma etapa em andamento será pausada.</p><label>Motivo<textarea name="reason" required maxlength="1000"></textarea></label>`, "block-parts");
+    if (action === "resume-parts") {
+      if (!window.confirm("Confirma que a falta de peças foi regularizada? A etapa continuará pausada até ser retomada manualmente.")) return;
+      await api("/orders/" + id + "/budgets/resume-after-parts", request("POST")); return await show(currentView);
+    }
     if (action === "execution") return await showExecution(id);
     if (action === "execution-transition") { await api("/orders/" + id + "/execution-steps/" + b.dataset.step + "/" + b.dataset.op, request("POST")); return await showExecution(id); }
     if (action === "portal-budgets") return await showBudgets(id, true);
@@ -284,6 +292,10 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "block-parts") {
+      if (!d.reason.trim()) throw new Error("Informe o motivo da interrupção.");
+      await api("/orders/" + d.id + "/budgets/block-for-parts", request("POST", {reason:d.reason})); return await show(currentView);
+    }
     if (action === "execution-start") { await api("/orders/" + d.id + "/execution-steps", request("POST", { kind: d.kind })); return await showExecution(d.id); }
     if (action === "rework") {
       if (!d.reason.trim()) throw new Error("Informe o motivo do retrabalho.");

@@ -39,6 +39,13 @@ public class ServiceOrder {
     @jakarta.persistence.JoinColumn(name = "vehicle_id")
     private Vehicle vehicleRef;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 40)
+    private OrderStage interruptedStage;
+
+    @Column(length = 1000)
+    private String partsBlockReason;
+
     private Instant closedAt;
 
     @Column(length = 30)
