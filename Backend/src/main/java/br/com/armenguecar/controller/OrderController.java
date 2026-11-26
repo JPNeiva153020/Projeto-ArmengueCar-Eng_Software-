@@ -71,6 +71,15 @@ public class OrderController {
         return orderService.decide(id, request);
     }
 
+    public record ReworkRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=1000) String reason) {}
+
+    @PostMapping("/{id}/rework")
+    @PreAuthorize("hasAnyRole('GERENTE', 'MECANICO', 'ADMIN')")
+    public ServiceOrder rework(@PathVariable UUID id, @Valid @RequestBody ReworkRequest request,
+                               org.springframework.security.core.Authentication auth) {
+        return orderService.rework(id, request.reason(), ((br.com.armenguecar.entity.User) auth.getPrincipal()).getId());
+    }
+
     @PatchMapping("/{id}/checklist")
     public ServiceOrder updateChecklist(
             @PathVariable UUID id,

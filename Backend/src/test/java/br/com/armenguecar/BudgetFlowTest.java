@@ -79,6 +79,14 @@ class BudgetFlowTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("EXECUCAO"));
         mvc.perform(patch("/api/orders/{id}/advance",f.orderId).header("Authorization",f.staff))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("CONTROLE_QUALIDADE"));
+        mvc.perform(post("/api/orders/{id}/rework",f.orderId).header("Authorization",f.staff)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Refazer pintura\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("EXECUCAO"));
+        mvc.perform(post("/api/orders/{id}/rework",f.orderId).header("Authorization",f.staff)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Duplicado\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/api/orders/{id}/advance",f.orderId).header("Authorization",f.staff))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("CONTROLE_QUALIDADE"));
         mvc.perform(patch("/api/orders/{id}/checklist",f.orderId).header("Authorization",f.staff)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"checklist\":[true,true,true,true,true]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("PRONTO_ENTREGA"));

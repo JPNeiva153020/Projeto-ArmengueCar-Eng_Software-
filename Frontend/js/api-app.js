@@ -158,6 +158,7 @@ function orderDetail(id) {
     <button class="btn" data-action="budgets" data-id="${id}">Orçamentos</button>
     ${o.stage === "AGUARDANDO_PECAS" ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
     <button class="btn" data-action="checklist" data-id="${id}">Checklist</button>
+    ${o.stage === "CONTROLE_QUALIDADE" && !o.closedAt ? `<button class="btn" data-action="rework" data-id="${id}">Enviar para retrabalho</button>` : ""}
     ${o.stage === "PRONTO_ENTREGA" && !o.closedAt && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn primary" data-action="delivery" data-id="${id}">Confirmar entrega</button>` : ""}</div>
     <p class="integration-note">Fotos reais e registro detalhado de etapas ainda estão em desenvolvimento.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
@@ -213,6 +214,7 @@ $("#app").addEventListener("click", async (event) => {
       return form("Confirmar entrega", `<input type="hidden" name="id" value="${escapeHtml(id)}"><p>Informe o uso efetivo de cada peça; o restante da reserva será liberado.</p>${reserved.map((r) => `<label>${escapeHtml(r.name)} · reservado: ${escapeHtml(r.reserved)} ${escapeHtml(r.unit)}<input type="number" name="used.${escapeHtml(r.itemId)}" value="${escapeHtml(r.reserved)}" min="0" max="${escapeHtml(r.reserved)}" step="0.01" required></label>`).join("") || "<p>Esta ordem não possui peças reservadas.</p>"}`, "delivery");
     }
     if (action === "budgets") return await showBudgets(id, false);
+    if (action === "rework") return form("Enviar para retrabalho", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Motivo<textarea name="reason" required maxlength="1000"></textarea></label>`, "rework");
     if (action === "portal-budgets") return await showBudgets(id, true);
     if (action === "publish-budget") {
       await api("/orders/" + id + "/budgets", request("POST"));
@@ -267,6 +269,11 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "rework") {
+      if (!d.reason.trim()) throw new Error("Informe o motivo do retrabalho.");
+      await api("/orders/" + d.id + "/rework", request("POST", { reason: d.reason }));
+      return await show(currentView);
+    }
     if (action === "delivery") {
       if (!window.confirm("Confirma a entrega e a baixa das quantidades informadas?")) return;
       const items = [...f.querySelectorAll('[name^="used."]')].map((input) => ({ itemId: input.name.slice(5), usedQuantity: Number(input.value) }));

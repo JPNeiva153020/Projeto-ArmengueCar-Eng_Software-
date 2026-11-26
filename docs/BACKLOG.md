@@ -11,7 +11,7 @@ Estado inicial verificado em 25/11/2026, commit c8bbe23: autenticação, consult
 | 3 | OS, histórico, cadastro de veículo e diagnóstico | RF05–RF08 | Em andamento: novas ordens usam veículo cadastrado e registros anteriores foram vinculados quando possível; diagnóstico básico e itens previstos de peças e mão de obra implementados; histórico completo pendente |
 | 4 | Orçamento por itens e versões, decisão do cliente | RF09–RF13 | Em andamento: versões e decisões no portal implementadas; revisar todos os critérios e notificações |
 | 5 | Reserva por OS, indisponibilidade e reposição | RF14–RF17, RF24–RF25 | Em andamento: reserva parcial e reavaliação após reposição manual; fluxo completo de solicitação pendente |
-| 6 | Execução, checklist, entrega e baixa idempotente | RF19–RF23 | Em andamento: checklist e entrega com baixa única implementados; tempos, etapas e retrabalho pendentes |
+| 6 | Execução, checklist, entrega e baixa idempotente | RF19–RF23 | Em andamento: checklist e entrega com baixa única implementados; retrabalho com motivo e auditoria implementado; tempos e etapas detalhadas pendentes |
 | 7 | Kanban, portal, fotos e notificações internas | RF18, RF26 | Em andamento: Kanban, consulta e decisões no portal implementados; fotos e geração de notificações pendentes |
 | 8 | Indicadores, auditoria, qualidade e recuperação | RF27–RF29, RNF01–RNF15 | Pendente |
 
@@ -34,3 +34,6 @@ Restrição de escopo da revisão: integração externa de mensagens não está 
 25/11/2026: itens previstos de peças e mão de obra podem ser cadastrados e removidos na etapa de diagnóstico, sem alterar estoque. Ainda não compõem o orçamento nem geram reservas. Migração V7 aplicada após backup; testes de estoque e permissões aprovados.
 
 25/11/2026: versões de orçamento, decisão pelo cliente, reserva parcial, reavaliação após entrada e entrega com baixa única validadas por testes automatizados e fluxo HTTP em PostgreSQL isolado. Dados históricos foram preservados e não constituem automaticamente reservas reais.
+
+26/11/2026: retorno da qualidade para execução com motivo, limpeza do checklist e registro de auditoria implementado; teste do fluxo integrado aprovado. A validação visual e demais critérios de execução continuam pendentes.
+

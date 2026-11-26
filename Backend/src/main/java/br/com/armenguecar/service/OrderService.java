@@ -29,19 +29,21 @@ public class OrderService {
     private final br.com.armenguecar.repository.VehicleRepository vehicles;
     private final br.com.armenguecar.repository.DiagnosisRepository diagnoses;
     private final br.com.armenguecar.repository.BudgetRepository budgets;
+    private final AuditService audit;
 
     public OrderService(
             ServiceOrderRepository orderRepository,
             ClientRepository clientRepository,
             br.com.armenguecar.repository.VehicleRepository vehicles,
             br.com.armenguecar.repository.DiagnosisRepository diagnoses,
-            br.com.armenguecar.repository.BudgetRepository budgets
+            br.com.armenguecar.repository.BudgetRepository budgets, AuditService audit
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
         this.vehicles = vehicles;
         this.diagnoses = diagnoses;
         this.budgets = budgets;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +116,21 @@ public class OrderService {
     @Transactional
     public ServiceOrder decide(UUID id, DecisionRequest request) {
         throw new IllegalStateException("A decisão deve ser registrada pelo cliente vinculado");
+    }
+
+    @Transactional
+    public ServiceOrder rework(UUID id, String reason, UUID actorId) {
+        ServiceOrder order = orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new EntityNotFoundException("OS não encontrada"));
+        if (order.getClosedAt() != null || order.getStage() != OrderStage.CONTROLE_QUALIDADE)
+            throw new IllegalStateException("Retrabalho disponível somente no controle de qualidade");
+        if (!order.isApproved() || !order.isReserved() || !hasApprovedBudget(id))
+            throw new IllegalStateException("Orçamento aprovado e reservas são necessários para retrabalho");
+        order.setStage(OrderStage.EXECUCAO);
+        order.setChecklist("[false, false, false, false, false]");
+        order.setProgress(progressFor(OrderStage.EXECUCAO));
+        audit.log(actorId, "RETRABALHO", id.toString(), reason.trim());
+        return orderRepository.save(order);
     }
 
     @Transactional
