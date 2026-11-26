@@ -93,12 +93,4 @@ public class OrderController {
         return orderService.deliver(id);
     }
 
-    @PostMapping("/{id}/photos")
-    public PhotoResponse addPhoto(@PathVariable UUID id) {
-        ServiceOrder order = orderService.addPhoto(id);
-        return new PhotoResponse(order.getId(), order.getPhotos());
-    }
-
-    public record PhotoResponse(UUID orderId, int photos) {
-    }
 }

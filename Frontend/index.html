@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ArmengueCar — Gestão de oficina</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
@@ -19,7 +21,11 @@
     .integration-content { padding: 24px; }
     .integration-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 22px; }
     .integration-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
-    .integration-nav button[aria-current="page"] { background: #244ec5; color: white; }
+    .nav-item[aria-current="page"] { background: #242e57; color: #fff; box-shadow: inset 3px 0 var(--royal2); }
+    .nav-item[hidden] { display: none; }
+    .integration-form input:not([type=checkbox]), .integration-form select, .integration-form textarea { border: 1px solid var(--line); border-radius: 8px; background: white; }
+    .integration-table { background: white; border: 1px solid var(--line); border-radius: 12px; }
+    .sidebar { overflow-y: auto; }
     .integration-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
     .integration-card { padding: 18px; border: 1px solid #dce3ef; border-radius: 10px; background: white; margin-bottom: 12px; }
     .integration-card h2 { margin-bottom: 8px; }
@@ -47,22 +53,27 @@
     <button class="btn primary full" type="submit">Entrar</button>
   </form>
 </div>
-<main id="shell" class="integration-content hidden">
-  <header class="integration-head"><div><h1>ArmengueCar</h1><p id="currentUser" class="muted"></p></div><button class="btn" id="logoutBtn">Sair</button></header>
-  <nav class="integration-nav" aria-label="Navegação principal">
-    <button class="btn" data-view="portal" hidden>Meus veículos</button>
-    <button class="btn" data-view="dashboard">Visão geral</button>
-    <button class="btn" data-view="kanban">Kanban</button>
-    <button class="btn" data-view="orders">Ordens de serviço</button>
-    <button class="btn" data-view="clients">Clientes</button>
-    <button class="btn" data-view="vehicles">Veículos</button>
-    <button class="btn" data-view="stock">Estoque</button>
-    <button class="btn" data-view="notifications">Notificações</button>
-    <button class="btn" data-view="users">Usuários</button>
-  </nav>
-  <p id="error" class="integration-error" role="alert"></p>
-  <section id="app"></section>
-</main>
+<div id="shell" class="app-shell hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">A</div><div><strong>Armengue<span>Car</span></strong><small>gestão de oficina</small></div></div>
+    <div class="role-card"><div class="avatar avatar-blue" id="roleAvatar">AC</div><div><strong id="currentUser"></strong></div></div>
+    <nav class="nav" aria-label="Navegação principal">
+      <button class="nav-item" data-view="portal" hidden><span>▱</span>Meus veículos</button>
+      <button class="nav-item" data-view="dashboard"><span>▦</span>Visão geral</button>
+      <button class="nav-item" data-view="kanban"><span>▤</span>Kanban</button>
+      <button class="nav-item" data-view="orders"><span>▣</span>Ordens de serviço</button>
+      <button class="nav-item" data-view="clients"><span>♙</span>Clientes</button>
+      <button class="nav-item" data-view="vehicles"><span>▱</span>Veículos</button>
+      <button class="nav-item" data-view="stock"><span>◫</span>Estoque</button>
+      <button class="nav-item" data-view="notifications"><span>◌</span>Notificações</button>
+      <button class="nav-item" data-view="users"><span>♙</span>Usuários</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot">ArmengueCar</span><button class="logout" id="logoutBtn">↪ Sair</button></div>
+  </aside>
+  <main class="main"><header class="topbar"><button class="mobile-menu" id="mobileMenu" type="button" aria-label="Abrir menu" aria-expanded="false">☰</button><div class="breadcrumbs"><span>ArmengueCar</span><b>/</b><strong id="pageTitle">Visão geral</strong></div></header>
+    <div class="content"><p id="error" class="integration-error" role="alert"></p><section id="app"></section></div>
+  </main>
+</div>
 <script src="js/api-app.js"></script>
 </body>
 </html>

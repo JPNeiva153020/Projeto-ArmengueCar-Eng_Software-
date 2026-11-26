@@ -167,12 +167,7 @@ public class OrderService {
         throw new IllegalStateException("Entrega indisponível até a baixa de peças ser implementada");
     }
 
-    @Transactional
-    public ServiceOrder addPhoto(UUID id) {
-        throw new IllegalStateException("Envio de fotos ainda não implementado");
-    }
-
-    private boolean hasApprovedBudget(UUID id) {
+private boolean hasApprovedBudget(UUID id) {
         return budgets.findFirstByOrderIdOrderByVersionDesc(id)
                 .map(budget -> budget.getStatus().equals("APROVADO")).orElse(false);
     }

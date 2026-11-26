@@ -21,7 +21,7 @@ async function api(path, options = {}) {
   try {
     response = await fetch(API + path, {
       ...options,
-      headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: "Bearer " + token } : {}), ...options.headers },
+      headers: { ...(options.body && !(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: "Bearer " + token } : {}), ...options.headers },
     });
   } catch {
     throw new Error("Não foi possível conectar à API. Verifique se o backend está em execução na porta 8080.");
@@ -57,6 +57,7 @@ async function start() {
   currentView = isClient ? "portal" : "dashboard";
   $("#login").classList.add("hidden"); $("#shell").classList.remove("hidden");
   $("#currentUser").textContent = user.name + " · " + user.role;
+  $("#roleAvatar").textContent = user.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   document.querySelector('[data-view="users"]').hidden = user.role !== "ADMIN";
   await show(currentView);
 }
@@ -74,23 +75,30 @@ $("#loginForm").addEventListener("submit", async (event) => {
   finally { button.disabled = false; }
 });
 $("#logoutBtn").addEventListener("click", logout);
+$("#mobileMenu").addEventListener("click", () => { const open = $("#sidebar").classList.toggle("open"); $("#mobileMenu").setAttribute("aria-expanded", String(open)); });
 document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => show(button.dataset.view)));
 
 async function show(view) {
+  clearPhotoUrls();
   currentView = view; $("#error").textContent = "";
+  const selected = document.querySelector(`[data-view="${view}"]`);
+  $("#pageTitle").textContent = selected ? selected.textContent.trim().replace(/^[▦▤▣♙▱◫◌]\s*/, "") : "ArmengueCar";
+  $("#sidebar").classList.remove("open"); $("#mobileMenu").setAttribute("aria-expanded", "false");
   document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-current", b.dataset.view === view ? "page" : "false"));
   $("#app").innerHTML = "<p>Carregando…</p>";
   try {
     if (view === "portal") {
       const ownOrders = await api("/portal/orders");
-      $("#app").innerHTML = `<h2>Meus veículos</h2><p class="integration-note">O acompanhamento mostra apenas as ordens vinculadas à sua conta. Fotos ainda estão em desenvolvimento.</p>${ownOrders.map((o) => `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2><p>${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p><p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Progresso: ${Number(o.progress)}%</p><button class="btn" data-action="portal-budgets" data-id="${escapeHtml(o.id)}">Ver orçamento</button></div>`).join("") || "<p>Nenhuma ordem vinculada à sua conta. Se precisar, procure a oficina.</p>"}`;
+      $("#app").innerHTML = `<h2>Meus veículos</h2><p class="integration-note">O acompanhamento mostra apenas as ordens vinculadas à sua conta. Consulte os orçamentos e as evidências disponibilizadas pela oficina.</p>${ownOrders.map((o) => `<div class="integration-card"><h2>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</h2><p>${escapeHtml(o.vehicle)}</p><p>${escapeHtml(o.problem)}</p><p>Etapa: ${escapeHtml(labels[o.stage] || o.stage)} · Progresso: ${Number(o.progress)}%</p><button class="btn" data-action="portal-budgets" data-id="${escapeHtml(o.id)}">Ver orçamento</button> <button class="btn" data-action="portal-photos" data-id="${escapeHtml(o.id)}">Ver fotos</button></div>`).join("") || "<p>Nenhuma ordem vinculada à sua conta. Se precisar, procure a oficina.</p>"}`;
     } else if (view === "dashboard") {
-      const data = await api("/dashboard");
-      $("#app").innerHTML = `<h2>Visão geral</h2><div class="integration-grid">
-        <div class="integration-card">Ordens totais<h2>${data.totalOrders}</h2></div>
-        <div class="integration-card">Ordens em andamento<h2>${data.activeOrders}</h2></div>
-        <div class="integration-card">Total orçado<h2>${money(data.totalBudget)}</h2></div>
-        <div class="integration-card">Itens em reposição<h2>${data.criticalStock}</h2></div></div>`;
+      const [data, allOrders, inventory] = await Promise.all([api("/dashboard"), api("/orders"), api("/stock")]);
+      const active = allOrders.filter((o) => !o.closedAt);
+      const counts = Object.fromEntries(Object.keys(labels).map((stage) => [stage, active.filter((o) => o.stage === stage).length]));
+      const low = inventory.filter((item) => Number(item.quantity) - Number(item.reservedQuantity || 0) <= Number(item.reorderPoint)).length;
+      $("#app").innerHTML = `<div class="page-head"><div><div class="eyebrow">Operação</div><h1>Tudo sob controle, ${escapeHtml(user.name.split(" ")[0])}.</h1><p>Acompanhe veículos, gargalos e decisões que precisam de atenção.</p></div><div class="actions"><button class="btn primary" data-action="new-order">+ Nova OS</button><button class="btn" data-action="open-kanban">Abrir Kanban</button></div></div>
+        <div class="kpis"><div class="card kpi"><div class="kpi-top">Em andamento</div><strong>${data.activeOrders}</strong><span class="trend">fluxo ativo</span></div><div class="card kpi"><div class="kpi-top">Aguardando decisão</div><strong>${counts.AGUARDANDO_APROVACAO}</strong><span class="muted">orçamento pendente</span></div><div class="card kpi"><div class="kpi-top">Estoque crítico</div><strong>${low}</strong><span class="muted">itens no ponto de reposição</span></div><div class="card kpi"><div class="kpi-top">Prontas para entrega</div><strong>${counts.PRONTO_ENTREGA}</strong><span class="muted">checklist aprovado</span></div></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Fluxo operacional</h2><small>8 ETAPAS</small></div><div class="card-body"><div class="status-strip">${Object.entries(labels).map(([stage,label]) => `<div class="status-chip"><b>${counts[stage]}</b><span>${escapeHtml(label)}</span></div>`).join("")}</div></div></div>
+        <div class="card"><div class="card-head"><h2>Ordens que exigem atenção</h2></div><div class="card-body list">${active.filter((o) => ["AGUARDANDO_APROVACAO", "AGUARDANDO_PECAS", "CONTROLE_QUALIDADE"].includes(o.stage)).map((o) => `<div class="list-row"><div class="list-main"><div class="car-thumb">▱</div><div><strong>${escapeHtml(o.number)} · ${escapeHtml(o.plate)}</strong><span>${escapeHtml(o.vehicle)} · ${escapeHtml(labels[o.stage])}</span></div></div></div>`).join("") || "<p>Nenhuma ordem aguardando atenção.</p>"}</div></div>`;
     } else if (view === "kanban") {
       orders = await api("/orders");
       const active = orders.filter((o) => !o.closedAt);
@@ -156,6 +164,7 @@ function orderDetail(id) {
     <button class="btn" data-action="diagnosis" data-id="${id}">Diagnóstico</button>
     <button class="btn" data-action="planned" data-id="${id}">Peças e serviços previstos</button>
     <button class="btn" data-action="budgets" data-id="${id}">Orçamentos</button>
+    <button class="btn" data-action="photos" data-id="${id}">Fotos</button>
     ${o.stage === "EXECUCAO" && !o.closedAt ? `<button class="btn" data-action="block-parts" data-id="${id}">Interromper por falta de peças</button>` : ""}
     ${o.stage === "AGUARDANDO_PECAS" && !o.interruptedStage ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
     ${o.stage === "AGUARDANDO_PECAS" && o.interruptedStage && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn" data-action="resume-parts" data-id="${id}">Confirmar regularização</button>` : ""}
@@ -164,8 +173,24 @@ function orderDetail(id) {
     ${o.stage === "CONTROLE_QUALIDADE" && !o.closedAt ? `<button class="btn" data-action="rework" data-id="${id}">Enviar para retrabalho</button>` : ""}
     ${o.stage === "PRONTO_ENTREGA" && !o.closedAt && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn primary" data-action="delivery" data-id="${id}">Confirmar entrega</button>` : ""}</div>
     ${o.partsBlockReason ? `<p class="integration-note">Falta de peças: ${escapeHtml(o.partsBlockReason)}</p>` : ""}
-    <p class="integration-note">Fotos reais e registro detalhado de etapas ainda estão em desenvolvimento.</p>
+    <p class="integration-note">Fotos só ficam visíveis ao cliente quando autorizadas pela equipe.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
+}
+let photoUrls = [];
+function clearPhotoUrls() { photoUrls.forEach((url) => URL.revokeObjectURL(url)); photoUrls = []; }
+async function showPhotos(id, portal) {
+  clearPhotoUrls();
+  const prefix = portal ? "/portal/orders/" : "/orders/";
+  const path = prefix + id + "/photos";
+  const photos = await api(path);
+  $("#app").innerHTML = `<h2>Fotos do reparo</h2><p>As fotos são associadas à etapa atual da ordem.</p>
+    ${portal ? "" : `<form class="integration-form" data-submit="photo-upload"><input type="hidden" name="id" value="${escapeHtml(id)}"><label>Imagem JPEG ou PNG, até 5 MB<input type="file" name="file" accept="image/jpeg,image/png" required></label><label><span><input type="checkbox" name="visibleToClient"> Autorizar visualização pelo cliente</span></label><button class="btn primary" type="submit">Enviar foto</button></form>`}
+    <div class="integration-grid" id="photoGallery">${photos.map((photo) => `<article class="integration-card"><img data-photo="${escapeHtml(photo.id)}" alt="Foto da etapa ${escapeHtml(labels[photo.stage] || photo.stage)}" style="width:100%;max-height:220px;object-fit:contain"><p>${escapeHtml(labels[photo.stage] || photo.stage)}${portal ? "" : (photo.visibleToClient ? " · Visível ao cliente" : " · Uso interno")}</p></article>`).join("") || "<p>Nenhuma foto disponível.</p>"}</div><button class="btn" data-action="back">Voltar</button>`;
+  for (const img of document.querySelectorAll("[data-photo]")) {
+    try { const response = await fetch(API + path + "/" + img.dataset.photo, { headers: { Authorization: "Bearer " + token } });
+      if (!response.ok) throw new Error("Falha ao carregar imagem"); const url = URL.createObjectURL(await response.blob()); photoUrls.push(url); img.src = url;
+    } catch { img.alt = "Não foi possível carregar a imagem"; }
+  }
 }
 async function showExecution(id) {
   const steps = await api("/orders/" + id + "/execution-steps");
@@ -221,6 +246,7 @@ $("#app").addEventListener("click", async (event) => {
     if (action === "reset-password") return form("Redefinir senha", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Nova senha<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>`, "reset-password");
     if (action === "new-client") return form("Novo cliente", '<label>Nome<input name="name" required></label><label>Telefone<input name="phone" required></label><label>E-mail<input name="email" type="email"></label><label>Placa<input name="plate"></label><label>Veículo<input name="vehicle"></label>', "client");
     if (action === "new-order") {
+      vehicles = await api("/vehicles");
       if (!vehicles.length) throw new Error("Cadastre um veículo antes de criar uma ordem.");
       return form("Nova ordem de serviço", `<label>Veículo e proprietário<select name="vehicleId" required>${vehicles.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.plate)} · ${escapeHtml(v.model)} · ${escapeHtml(v.client.name)}</option>`).join("")}</select></label><label>Problema<textarea name="problem" required></textarea></label>`, "order");
     }
@@ -238,6 +264,8 @@ $("#app").addEventListener("click", async (event) => {
     }
     if (action === "execution") return await showExecution(id);
     if (action === "execution-transition") { await api("/orders/" + id + "/execution-steps/" + b.dataset.step + "/" + b.dataset.op, request("POST")); return await showExecution(id); }
+    if (action === "open-kanban") return await show("kanban");
+    if (action === "photos" || action === "portal-photos") return await showPhotos(id, action === "portal-photos");
     if (action === "portal-budgets") return await showBudgets(id, true);
     if (action === "publish-budget") {
       await api("/orders/" + id + "/budgets", request("POST"));
@@ -292,6 +320,11 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "photo-upload") {
+      button.textContent = "Enviando…";
+      const formData = new FormData(f); formData.set("visibleToClient", f.elements.visibleToClient.checked ? "true" : "false");
+      await api("/orders/" + d.id + "/photos", {method:"POST", body:formData}); return await showPhotos(d.id, false);
+    }
     if (action === "block-parts") {
       if (!d.reason.trim()) throw new Error("Informe o motivo da interrupção.");
       await api("/orders/" + d.id + "/budgets/block-for-parts", request("POST", {reason:d.reason})); return await show(currentView);
@@ -329,6 +362,6 @@ $("#app").addEventListener("submit", async (event) => {
     else if (action === "movement") await api("/stock/movements", request("POST", { ...d, quantity: Number(d.quantity) }));
     else if (action === "stock") await api("/stock/" + d.id, request("PUT", { name: d.name, code: d.code, quantity: Number(d.quantity), reorderPoint: Number(d.reorderPoint), unit: d.unit }));
     await show(currentView);
-  } catch (error) { showError(error); } finally { button.disabled = false; }
+  } catch (error) { showError(error); } finally { button.disabled = false; if (action === "photo-upload") button.textContent = "Enviar foto"; }
 });
 if (token) start().catch((error) => { logout(); $("#loginError").textContent = error.message; });

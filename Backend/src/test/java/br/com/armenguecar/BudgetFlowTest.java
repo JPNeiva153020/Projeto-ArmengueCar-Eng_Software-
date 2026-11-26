@@ -158,4 +158,32 @@ class BudgetFlowTest {
         org.junit.jupiter.api.Assertions.assertEquals(0.0,
                 stock.findByNameIgnoreCase("Tinta PU Branco").orElseThrow().getReservedQuantity());
     }
+
+    @Test
+    void repairPhotosRespectVisibilityAndOwnership() throws Exception {
+        Fixture f=setup(1);
+        var image=new java.awt.image.BufferedImage(2,2,java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var out=new java.io.ByteArrayOutputStream(); javax.imageio.ImageIO.write(image,"png",out);
+        var file=new org.springframework.mock.web.MockMultipartFile("file","teste.png","image/png",out.toByteArray());
+        var privateResponse=mvc.perform(multipart("/api/orders/{id}/photos",f.orderId).file(file)
+                        .param("visibleToClient","false").header("Authorization",f.staff))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var privateId=json.readTree(privateResponse).get("id").asText();
+        mvc.perform(get("/api/portal/orders/{id}/photos",f.orderId).header("Authorization",f.client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/portal/orders/{id}/photos/{photoId}",f.orderId,privateId).header("Authorization",f.client))
+                .andExpect(status().isNotFound());
+        var publicResponse=mvc.perform(multipart("/api/orders/{id}/photos",f.orderId).file(file)
+                        .param("visibleToClient","true").header("Authorization",f.staff))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var publicId=json.readTree(publicResponse).get("id").asText();
+        mvc.perform(get("/api/portal/orders/{id}/photos/{photoId}",f.orderId,publicId).header("Authorization",f.client))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        String outsider=login("eduardo@armenguecar.local","1234");
+        mvc.perform(get("/api/portal/orders/{id}/photos/{photoId}",f.orderId,publicId).header("Authorization",outsider))
+                .andExpect(status().isNotFound());
+        var bad=new org.springframework.mock.web.MockMultipartFile("file","fake.png","image/png",new byte[]{1,2,3});
+        mvc.perform(multipart("/api/orders/{id}/photos",f.orderId).file(bad).header("Authorization",f.staff))
+                .andExpect(status().isBadRequest());
+    }
 }
