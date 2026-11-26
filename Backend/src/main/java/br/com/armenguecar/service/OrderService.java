@@ -30,6 +30,7 @@ public class OrderService {
     private final br.com.armenguecar.repository.DiagnosisRepository diagnoses;
     private final br.com.armenguecar.repository.BudgetRepository budgets;
     private final AuditService audit;
+    private final NotificationOutboxService outbox;
     private final br.com.armenguecar.repository.ExecutionStepRepository executionSteps;
 
     public OrderService(
@@ -37,7 +38,7 @@ public class OrderService {
             ClientRepository clientRepository,
             br.com.armenguecar.repository.VehicleRepository vehicles,
             br.com.armenguecar.repository.DiagnosisRepository diagnoses,
-            br.com.armenguecar.repository.BudgetRepository budgets, AuditService audit, br.com.armenguecar.repository.ExecutionStepRepository executionSteps
+            br.com.armenguecar.repository.BudgetRepository budgets, AuditService audit, br.com.armenguecar.repository.ExecutionStepRepository executionSteps, NotificationOutboxService outbox
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
@@ -46,6 +47,7 @@ public class OrderService {
         this.budgets = budgets;
         this.audit = audit;
         this.executionSteps = executionSteps;
+        this.outbox = outbox;
     }
 
     @Transactional(readOnly = true)
@@ -105,6 +107,7 @@ public class OrderService {
             case PRONTO_ENTREGA -> throw new IllegalStateException("OS já está pronta para entrega");
         }
         order.setProgress(progressFor(order.getStage()));
+        outbox.enqueue(order.getClient().getUserId(),id,"Atualização da ordem","A ordem "+order.getNumber()+" avançou para "+order.getStage().name().replace('_',' ')+".","order");
         return orderRepository.save(order);
     }
 
@@ -135,6 +138,7 @@ public class OrderService {
         order.setChecklist("[false, false, false, false, false]");
         order.setProgress(progressFor(OrderStage.EXECUCAO));
         audit.log(actorId, "RETRABALHO", id.toString(), reason.trim());
+        outbox.enqueue(order.getClient().getUserId(),id,"Atualização da ordem","A ordem "+order.getNumber()+" retornou à execução após avaliação de qualidade.","order");
         return orderRepository.save(order);
     }
 
@@ -157,6 +161,7 @@ public class OrderService {
         if (completed) {
             order.setStage(OrderStage.PRONTO_ENTREGA);
             order.setProgress(100);
+            outbox.enqueue(order.getClient().getUserId(),id,"Veículo pronto para entrega","A ordem "+order.getNumber()+" concluiu o controle de qualidade.","order");
         }
 
         return orderRepository.save(order);

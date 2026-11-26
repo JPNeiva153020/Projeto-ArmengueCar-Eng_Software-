@@ -144,7 +144,7 @@ async function show(view) {
         ${stock.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.code)}</td><td>${s.quantity} ${escapeHtml(s.unit)}</td><td>${s.reservedQuantity}</td><td>${Math.max(0, s.quantity - s.reservedQuantity).toFixed(2)}</td><td>${s.reorderPoint}</td><td><button class="btn" data-action="edit-stock" data-id="${escapeHtml(s.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item cadastrado.</td></tr>'}</tbody></table></div>`;
     } else if (view === "notifications") {
       notifications = await api("/notifications");
-      $("#app").innerHTML = `<div class="integration-head"><h2>Notificações</h2><button class="btn" data-action="read-all">Marcar todas como lidas</button></div>${notifications.map((n) => `<div class="integration-card"><strong>${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p><small>${n.read ? "Lida" : "Não lida"}</small> ${n.read ? "" : `<button class="btn" data-action="read" data-id="${escapeHtml(n.id)}">Marcar lida</button>`}</div>`).join("") || "<p>Nenhuma notificação.</p>"}`;
+      $("#app").innerHTML = `<div class="integration-head"><h2>Notificações</h2><button class="btn" data-action="read-all">Marcar todas como lidas</button></div>${notifications.map((n) => `<div class="integration-card"><strong>${escapeHtml(n.title)}</strong><p>${escapeHtml(n.message)}</p><small>${n.read ? "Lida" : "Não lida"}</small> ${n.read ? "" : `<button class="btn" data-action="read" data-id="${escapeHtml(n.id)}">Marcar lida</button>`} ${n.targetOrderId ? `<button class="btn" data-action="open-notification" data-id="${escapeHtml(n.id)}">Abrir ordem</button>` : ""}</div>`).join("") || "<p>Nenhuma notificação.</p>"}`;
     } else if (view === "users" && user.role === "ADMIN") {
       users = await api("/users");
       $("#app").innerHTML = `<div class="integration-head"><h2>Usuários</h2><button class="btn primary" data-action="new-user">+ Novo usuário</button></div><div class="integration-table"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>${users.map((u) => `<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.role)}</td><td>${u.active ? "Ativo" : "Inativo"}</td><td><button class="btn" data-action="edit-user" data-id="${escapeHtml(u.id)}">Editar</button> <button class="btn" data-action="reset-password" data-id="${escapeHtml(u.id)}">Redefinir senha</button> <button class="btn" data-action="toggle-user" data-id="${escapeHtml(u.id)}" ${u.id === user.id ? "disabled" : ""}>${u.active ? "Desativar" : "Ativar"}</button></td></tr>`).join("")}</tbody></table></div>`;
@@ -264,6 +264,20 @@ $("#app").addEventListener("click", async (event) => {
     }
     if (action === "execution") return await showExecution(id);
     if (action === "execution-transition") { await api("/orders/" + id + "/execution-steps/" + b.dataset.step + "/" + b.dataset.op, request("POST")); return await showExecution(id); }
+    if (action === "open-notification") {
+      const n = notifications.find((item) => item.id === id);
+      if (!n || !n.targetOrderId) throw new Error("Ordem não encontrada.");
+      if (!n.read) await api("/notifications/" + id + "/read", request("PATCH"));
+      if (user.role === "CLIENTE") {
+        if (n.targetView === "budget") return await showBudgets(n.targetOrderId, true);
+        const ownOrders = await api("/portal/orders");
+        const order = ownOrders.find((o) => o.id === n.targetOrderId);
+        if (!order) throw new Error("Ordem não disponível.");
+        $("#app").innerHTML = `<div class="integration-card"><h2>${escapeHtml(order.number)} · ${escapeHtml(order.plate)}</h2><p>${escapeHtml(order.vehicle)}</p><p>${escapeHtml(order.problem)}</p><p>Etapa: ${escapeHtml(labels[order.stage] || order.stage)} · Progresso: ${Number(order.progress)}%</p><button class="btn" data-action="portal-budgets" data-id="${escapeHtml(order.id)}">Ver orçamento</button> <button class="btn" data-action="portal-photos" data-id="${escapeHtml(order.id)}">Ver fotos</button> <button class="btn" data-action="back">Voltar</button></div>`;
+        return;
+      }
+      orders = await api("/orders"); return orderDetail(n.targetOrderId);
+    }
     if (action === "open-kanban") return await show("kanban");
     if (action === "photos" || action === "portal-photos") return await showPhotos(id, action === "portal-photos");
     if (action === "portal-budgets") return await showBudgets(id, true);

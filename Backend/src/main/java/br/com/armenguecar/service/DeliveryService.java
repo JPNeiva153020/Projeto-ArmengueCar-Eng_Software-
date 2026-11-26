@@ -24,11 +24,12 @@ public class DeliveryService {
     private final StockMovementRepository movements;
     private final UserRepository users;
     private final AuditService audit;
+    private final NotificationOutboxService outbox;
     public DeliveryService(ServiceOrderRepository orders, BudgetRepository budgets, BudgetLineRepository lines,
                            PartReservationRepository reservations, StockItemRepository stock,
-                           StockMovementRepository movements, UserRepository users, AuditService audit) {
+                           StockMovementRepository movements, UserRepository users, AuditService audit, NotificationOutboxService outbox) {
         this.orders=orders; this.budgets=budgets; this.lines=lines; this.reservations=reservations;
-        this.stock=stock; this.movements=movements; this.users=users; this.audit=audit;
+        this.stock=stock; this.movements=movements; this.users=users; this.audit=audit; this.outbox=outbox;
     }
     public record ItemUsed(@NotNull UUID itemId,
                            @NotNull @DecimalMin("0.00") @Digits(integer=10,fraction=2) BigDecimal usedQuantity) {}
@@ -94,6 +95,7 @@ public class DeliveryService {
         order.setClosedAt(Instant.now()); order.setClosedReason("ENTREGA"); order.setClosedBy(actorId);
         order.setReserved(false); orders.save(order);
         audit.log(actorId,"ENTREGA_CONFIRMADA",orderId.toString(),order.getNumber());
+        outbox.enqueue(order.getClient().getUserId(),orderId,"Entrega confirmada","A entrega da ordem "+order.getNumber()+" foi confirmada.","order");
         return order;
     }
     private Budget approvedBudget(UUID orderId) {

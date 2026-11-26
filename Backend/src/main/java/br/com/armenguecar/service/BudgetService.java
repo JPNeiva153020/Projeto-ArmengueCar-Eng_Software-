@@ -24,12 +24,13 @@ public class BudgetService {
     private final ClientRepository clients;
     private final UserRepository users;
     private final AuditService audit;
+    private final NotificationOutboxService outbox;
     private final ExecutionStepRepository executionSteps;
     public BudgetService(ServiceOrderRepository orders, DiagnosisRepository diagnoses, PlannedItemRepository planned,
                          BudgetRepository budgets, BudgetLineRepository lines, PartReservationRepository reservations,
-                         StockItemRepository stock, ClientRepository clients, UserRepository users, AuditService audit, ExecutionStepRepository executionSteps) {
+                         StockItemRepository stock, ClientRepository clients, UserRepository users, AuditService audit, ExecutionStepRepository executionSteps, NotificationOutboxService outbox) {
         this.orders=orders; this.diagnoses=diagnoses; this.planned=planned; this.budgets=budgets;
-        this.lines=lines; this.reservations=reservations; this.stock=stock; this.clients=clients; this.users=users; this.audit=audit; this.executionSteps=executionSteps;
+        this.lines=lines; this.reservations=reservations; this.stock=stock; this.clients=clients; this.users=users; this.audit=audit; this.executionSteps=executionSteps; this.outbox=outbox;
     }
     public record LineView(String type, String description, BigDecimal quantity, BigDecimal unitPrice) {}
     public record BudgetView(UUID id, int version, String status, BigDecimal total,
@@ -84,6 +85,7 @@ public class BudgetService {
         order.setValue(total.doubleValue()); order.setApproved(false); order.setReserved(false);
         order.setStage(OrderStage.AGUARDANDO_APROVACAO); order.setProgress(38); orders.save(order);
         audit.log(actorId,"ORCAMENTO_PUBLICADO",orderId.toString(),"Versão "+budget.getVersion());
+        outbox.enqueue(order.getClient().getUserId(),orderId,"Orçamento disponível","A ordem "+order.getNumber()+" possui um orçamento para avaliação.","budget");
         return view(budget);
     }
     @Transactional
@@ -118,6 +120,7 @@ public class BudgetService {
         }
         orders.save(order); budgets.save(budget);
         audit.log(actorId,"ORCAMENTO_"+target,orderId.toString(),"Versão "+budget.getVersion());
+        outbox.enqueue(budget.getPublishedBy(),orderId,"Decisão do orçamento","O cliente registrou decisão na ordem "+order.getNumber()+": "+target.replace('_',' ')+".","order");
         return view(budget);
     }
     @Transactional
@@ -135,6 +138,7 @@ public class BudgetService {
         if (complete) order.setStage(OrderStage.AGUARDANDO_INICIO);
         orders.save(order);
         audit.log(actorId,"RESERVAS_REAVALIADAS",orderId.toString(),complete ? "Completas" : "Pendentes");
+        if (complete) outbox.enqueue(order.getClient().getUserId(),orderId,"Peças disponíveis","As peças da ordem "+order.getNumber()+" foram reservadas.","order");
         return view(budget);
     }
     @Transactional
@@ -156,6 +160,7 @@ public class BudgetService {
         order.setInterruptedStage(OrderStage.EXECUCAO); order.setPartsBlockReason(reason.trim());
         order.setStage(OrderStage.AGUARDANDO_PECAS); orders.save(order);
         audit.log(actorId,"EXECUCAO_INTERROMPIDA_PECA",orderId.toString(),reason.trim());
+        outbox.enqueue(order.getClient().getUserId(),orderId,"Ordem aguardando peças","O serviço da ordem "+order.getNumber()+" está aguardando peças.","order");
         return order;
     }
     @Transactional
@@ -168,6 +173,7 @@ public class BudgetService {
         if (!reserveAvailable(budget)) throw new IllegalStateException("As reservas do orçamento ainda estão incompletas");
         order.setReserved(true); order.setStage(OrderStage.EXECUCAO); order.setInterruptedStage(null); order.setPartsBlockReason(null);
         orders.save(order); audit.log(actorId,"EXECUCAO_LIBERADA_PECA",orderId.toString(),"Regularização confirmada; etapa permanece pausada até retomada manual");
+        outbox.enqueue(order.getClient().getUserId(),orderId,"Ordem liberada","A ordem "+order.getNumber()+" foi liberada para retomada.","order");
         return order;
     }
     private boolean reserveAvailable(Budget budget) {

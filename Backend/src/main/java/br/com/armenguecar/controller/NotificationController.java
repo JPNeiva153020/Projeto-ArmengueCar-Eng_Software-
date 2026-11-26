@@ -22,15 +22,22 @@ import java.util.UUID;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final br.com.armenguecar.repository.NotificationEventRepository events;
+    private final br.com.armenguecar.service.NotificationOutboxService outbox;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NotificationController.class);
 
-    public NotificationController(NotificationRepository notificationRepository) {
-        this.notificationRepository = notificationRepository;
+    public NotificationController(NotificationRepository notificationRepository, br.com.armenguecar.repository.NotificationEventRepository events, br.com.armenguecar.service.NotificationOutboxService outbox) {
+        this.notificationRepository = notificationRepository; this.events=events; this.outbox=outbox;
     }
 
     @GetMapping
     public List<Notification> list(Authentication authentication) {
         User user = currentUser(authentication);
 
+        for (var event : events.findTop100ByRecipientIdAndProcessedAtIsNullOrderByCreatedAtAsc(user.getId())) {
+            try { outbox.process(event.getId(),user.getId()); }
+            catch (RuntimeException ex) { log.warn("Falha ao gerar notificação; será tentada novamente. Evento {}",event.getId()); }
+        }
         return notificationRepository.findAll().stream()
                 .filter(notification -> notification.getUser().getId().equals(user.getId()))
                 .sorted(Comparator.comparing(Notification::getCreatedAt).reversed())
