@@ -77,6 +77,19 @@ class BudgetFlowTest {
         org.junit.jupiter.api.Assertions.assertEquals(25.0,stock.findById(piece.getId()).orElseThrow().getReservedQuantity());
         mvc.perform(patch("/api/orders/{id}/advance",f.orderId).header("Authorization",f.staff))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("EXECUCAO"));
+        mvc.perform(patch("/api/orders/{id}/advance",f.orderId).header("Authorization",f.staff)).andExpect(status().isBadRequest());
+        var step=json.readTree(postJson("/api/orders/"+f.orderId+"/execution-steps",f.staff,Map.of("kind","PINTURA")));
+        String stepPath="/api/orders/"+f.orderId+"/execution-steps/"+step.get("id").asText();
+        mvc.perform(post("/api/orders/{id}/execution-steps",f.orderId).header("Authorization",f.staff)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"kind\":\"MONTAGEM\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/orders/{id}/execution-steps",f.orderId).header("Authorization",f.client))
+                .andExpect(status().isForbidden());
+
+        postJson(stepPath+"/pause",f.staff,Map.of());
+        mvc.perform(post(stepPath+"/pause").header("Authorization",f.staff)).andExpect(status().isBadRequest());
+        postJson(stepPath+"/resume",f.staff,Map.of());
+        postJson(stepPath+"/finish",f.staff,Map.of());
         mvc.perform(patch("/api/orders/{id}/advance",f.orderId).header("Authorization",f.staff))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.stage").value("CONTROLE_QUALIDADE"));
         mvc.perform(post("/api/orders/{id}/rework",f.orderId).header("Authorization",f.staff)

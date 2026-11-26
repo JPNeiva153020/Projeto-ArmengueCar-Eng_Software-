@@ -30,13 +30,14 @@ public class OrderService {
     private final br.com.armenguecar.repository.DiagnosisRepository diagnoses;
     private final br.com.armenguecar.repository.BudgetRepository budgets;
     private final AuditService audit;
+    private final br.com.armenguecar.repository.ExecutionStepRepository executionSteps;
 
     public OrderService(
             ServiceOrderRepository orderRepository,
             ClientRepository clientRepository,
             br.com.armenguecar.repository.VehicleRepository vehicles,
             br.com.armenguecar.repository.DiagnosisRepository diagnoses,
-            br.com.armenguecar.repository.BudgetRepository budgets, AuditService audit
+            br.com.armenguecar.repository.BudgetRepository budgets, AuditService audit, br.com.armenguecar.repository.ExecutionStepRepository executionSteps
     ) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
@@ -44,6 +45,7 @@ public class OrderService {
         this.diagnoses = diagnoses;
         this.budgets = budgets;
         this.audit = audit;
+        this.executionSteps = executionSteps;
     }
 
     @Transactional(readOnly = true)
@@ -91,6 +93,9 @@ public class OrderService {
             }
             case EXECUCAO -> {
                 if (!hasApprovedBudget(id)) throw new IllegalStateException("Orçamento aprovado não encontrado; revise esta ordem antiga");
+                var steps = executionSteps.findByOrderIdOrderByStartedAtAsc(id);
+                if (steps.isEmpty() || steps.stream().anyMatch(step -> !step.getStatus().equals("CONCLUIDA")))
+                    throw new IllegalStateException("Conclua as etapas de execução antes do controle de qualidade");
                 order.setStage(OrderStage.CONTROLE_QUALIDADE);
             }
             case DIAGNOSTICO -> throw new IllegalStateException("Publique o orçamento por itens para solicitar aprovação");

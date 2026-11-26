@@ -157,11 +157,24 @@ function orderDetail(id) {
     <button class="btn" data-action="planned" data-id="${id}">Peças e serviços previstos</button>
     <button class="btn" data-action="budgets" data-id="${id}">Orçamentos</button>
     ${o.stage === "AGUARDANDO_PECAS" ? `<button class="btn" data-action="retry-reservation" data-id="${id}">Reavaliar reservas</button>` : ""}
+    ${o.stage === "EXECUCAO" ? `<button class="btn" data-action="execution" data-id="${id}">Etapas de execução</button>` : ""}
     <button class="btn" data-action="checklist" data-id="${id}">Checklist</button>
     ${o.stage === "CONTROLE_QUALIDADE" && !o.closedAt ? `<button class="btn" data-action="rework" data-id="${id}">Enviar para retrabalho</button>` : ""}
     ${o.stage === "PRONTO_ENTREGA" && !o.closedAt && ["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn primary" data-action="delivery" data-id="${id}">Confirmar entrega</button>` : ""}</div>
     <p class="integration-note">Fotos reais e registro detalhado de etapas ainda estão em desenvolvimento.</p>
     <button class="btn" data-action="back">Voltar</button></div>`;
+}
+async function showExecution(id) {
+  const steps = await api("/orders/" + id + "/execution-steps");
+  const names = { FUNILARIA: "Funilaria", PINTURA: "Pintura", ESTRUTURA: "Estrutura", MONTAGEM: "Montagem", OUTRO: "Outro" };
+  const statuses = { EM_ANDAMENTO: "Em andamento", PAUSADA: "Pausada", CONCLUIDA: "Concluída" };
+  $("#app").innerHTML = `<h2>Etapas de execução</h2><p>O tempo é contabilizado enquanto a etapa está em andamento. Atualize a tela para consultar o tempo atual.</p>
+    ${steps.map((step) => `<div class="integration-card"><strong>${escapeHtml(names[step.kind] || step.kind)}</strong><p>${escapeHtml(statuses[step.status])} · ${Math.floor(step.activeMillis / 60000)} min ${Math.floor(step.activeMillis / 1000) % 60} s</p><div class="integration-actions">
+    ${step.status === "EM_ANDAMENTO" ? `<button class="btn" data-action="execution-transition" data-op="pause" data-id="${id}" data-step="${step.id}">Pausar</button>` : ""}
+    ${step.status === "PAUSADA" ? `<button class="btn" data-action="execution-transition" data-op="resume" data-id="${id}" data-step="${step.id}">Retomar</button>` : ""}
+    ${step.status !== "CONCLUIDA" ? `<button class="btn primary" data-action="execution-transition" data-op="finish" data-id="${id}" data-step="${step.id}">Concluir etapa</button>` : ""}</div></div>`).join("") || "<p>Nenhuma etapa registrada.</p>"}
+    ${steps.some((step) => step.status !== "CONCLUIDA") ? "" : `<form class="integration-form" data-submit="execution-start"><input type="hidden" name="id" value="${escapeHtml(id)}"><label>Tipo de etapa<select name="kind">${Object.entries(names).map(([key,name]) => `<option value="${key}">${name}</option>`).join("")}</select></label><button class="btn primary" type="submit">Iniciar etapa</button></form>`}
+    <div class="integration-actions"><button class="btn" data-action="back">Voltar</button></div>`;
 }
 async function showBudgets(orderId, portal) {
   const prefix = portal ? "/portal/orders/" : "/orders/";
@@ -215,6 +228,8 @@ $("#app").addEventListener("click", async (event) => {
     }
     if (action === "budgets") return await showBudgets(id, false);
     if (action === "rework") return form("Enviar para retrabalho", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Motivo<textarea name="reason" required maxlength="1000"></textarea></label>`, "rework");
+    if (action === "execution") return await showExecution(id);
+    if (action === "execution-transition") { await api("/orders/" + id + "/execution-steps/" + b.dataset.step + "/" + b.dataset.op, request("POST")); return await showExecution(id); }
     if (action === "portal-budgets") return await showBudgets(id, true);
     if (action === "publish-budget") {
       await api("/orders/" + id + "/budgets", request("POST"));
@@ -269,6 +284,7 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "execution-start") { await api("/orders/" + d.id + "/execution-steps", request("POST", { kind: d.kind })); return await showExecution(d.id); }
     if (action === "rework") {
       if (!d.reason.trim()) throw new Error("Informe o motivo do retrabalho.");
       await api("/orders/" + d.id + "/rework", request("POST", { reason: d.reason }));
