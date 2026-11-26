@@ -16,8 +16,9 @@ if errorlevel 1 (echo Falha na compilacao. & pause & exit /b 1)
 echo Iniciando backend e interface em janelas separadas...
 start "ArmengueCar Backend" cmd /k "cd /d ""%PROJECT%\Backend"" && call ""%MAVEN%"" spring-boot:run"
 start "ArmengueCar Interface" cmd /k "cd /d ""%PROJECT%\Frontend"" && python -m http.server 5500 --bind 127.0.0.1"
-echo Aguarde o backend iniciar. O navegador sera aberto em 20 segundos.
-timeout /t 20 /nobreak >nul
+echo Aguardando a API iniciar por ate 90 segundos...
+powershell -NoProfile -Command "$end=(Get-Date).AddSeconds(90); do { try { $c=New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1',8080); $c.Close(); exit 0 } catch { Start-Sleep -Seconds 2 } } while ((Get-Date) -lt $end); exit 1"
+if errorlevel 1 (echo API nao iniciou. Confira a janela ArmengueCar Backend para ver o erro. & pause & exit /b 1)
 start "" "http://127.0.0.1:5500"
 echo Para encerrar, feche as duas janelas do projeto.
 pause
