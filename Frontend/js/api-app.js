@@ -139,7 +139,7 @@ async function show(view) {
         ${vehicles.map((v) => `<tr><td>${escapeHtml(v.plate)}</td><td>${escapeHtml(v.model)}</td><td>${escapeHtml(v.brand)} ${escapeHtml(v.modelYear)}</td><td>${escapeHtml(v.client.name)}</td><td><button class="btn" data-action="edit-vehicle" data-id="${escapeHtml(v.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum veículo cadastrado.</td></tr>'}</tbody></table></div>`;
     } else if (view === "stock") {
       stock = await api("/stock");
-      $("#app").innerHTML = `<div class="integration-head"><h2>Estoque</h2><button class="btn primary" data-action="move-stock">+ Movimentar</button></div>
+      $("#app").innerHTML = `<div class="integration-head"><h2>Estoque</h2><div class="integration-actions">${["GERENTE","ADMIN"].includes(user.role) ? `<button class="btn" data-action="restock-list">Solicitações de reposição</button>` : ""}<button class="btn primary" data-action="move-stock">+ Movimentar</button></div></div>
         <div class="integration-table"><table><thead><tr><th>Item</th><th>Código</th><th>Saldo físico</th><th>Reservado</th><th>Disponível</th><th>Reposição</th><th></th></tr></thead><tbody>
         ${stock.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.code)}</td><td>${s.quantity} ${escapeHtml(s.unit)}</td><td>${s.reservedQuantity}</td><td>${Math.max(0, s.quantity - s.reservedQuantity).toFixed(2)}</td><td>${s.reorderPoint}</td><td><button class="btn" data-action="edit-stock" data-id="${escapeHtml(s.id)}">Editar</button></td></tr>`).join("") || '<tr><td colspan="5">Nenhum item cadastrado.</td></tr>'}</tbody></table></div>`;
     } else if (view === "notifications") {
@@ -191,6 +191,13 @@ async function showPhotos(id, portal) {
       if (!response.ok) throw new Error("Falha ao carregar imagem"); const url = URL.createObjectURL(await response.blob()); photoUrls.push(url); img.src = url;
     } catch { img.alt = "Não foi possível carregar a imagem"; }
   }
+}
+async function showRestocks() {
+  const [requests, inventory] = await Promise.all([api("/stock/restock-requests"), api("/stock")]);
+  stock = inventory;
+  $("#app").innerHTML = `<div class="integration-head"><h2>Solicitações de reposição</h2><button class="btn primary" data-action="restock-new">+ Solicitar reposição</button></div>
+    <p>Confirme o recebimento somente após a chegada das peças. O registro adiciona a quantidade solicitada ao estoque.</p>
+    ${requests.map((r) => `<div class="integration-card"><strong>${escapeHtml(r.item.name)}</strong><p>Quantidade: ${escapeHtml(r.quantity)} ${escapeHtml(r.item.unit)} · Situação: ${escapeHtml(r.status)}</p>${r.note ? `<p>${escapeHtml(r.note)}</p>` : ""}${r.status === "ABERTA" ? `<button class="btn primary" data-action="restock-resolve" data-op="receive" data-id="${escapeHtml(r.id)}">Confirmar recebimento</button> <button class="btn" data-action="restock-resolve" data-op="cancel" data-id="${escapeHtml(r.id)}">Cancelar solicitação</button>` : ""}</div>`).join("") || "<p>Nenhuma solicitação registrada.</p>"}<button class="btn" data-action="back">Voltar ao estoque</button>`;
 }
 async function showExecution(id) {
   const steps = await api("/orders/" + id + "/execution-steps");
@@ -244,7 +251,18 @@ $("#app").addEventListener("click", async (event) => {
       return form("Editar usuário", `<input type="hidden" name="id" value="${escapeHtml(u.id)}"><label>Nome<input name="name" value="${escapeHtml(u.name)}" required maxlength="255"></label><label>E-mail<input name="email" type="email" value="${escapeHtml(u.email)}" required maxlength="255"></label><label>Perfil<select name="role">${["MECANICO","GERENTE","ADMIN","CLIENTE"].map((role) => `<option value="${role}" ${u.role === role ? "selected" : ""}>${role}</option>`).join("")}</select></label>`, "update-user");
     }
     if (action === "reset-password") return form("Redefinir senha", `<input type="hidden" name="id" value="${escapeHtml(id)}"><label>Nova senha<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>`, "reset-password");
-    if (action === "new-client") return form("Novo cliente", '<label>Nome<input name="name" required></label><label>Telefone<input name="phone" required></label><label>E-mail<input name="email" type="email"></label><label>Placa<input name="plate"></label><label>Veículo<input name="vehicle"></label>', "client");
+    if (action === "new-client") {
+      form("Novo cliente", `<label>Nome<input name="name" required maxlength="255"></label><label>Telefone<input name="phone" required maxlength="255"></label><label>E-mail<input name="email" type="email" maxlength="255"></label><p>Para cadastrar um veículo agora, informe placa e modelo juntos.</p><label>Placa<input name="plate" maxlength="255"></label><label>Modelo do veículo<input name="vehicle" maxlength="255"></label>${user.role === "ADMIN" ? `<label><span><input type="checkbox" name="createAccount"> Criar acesso ao portal para este cliente</span></label><div id="portalAccessFields" class="hidden"><label>Senha inicial do portal<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label><p>O e-mail e a senha serão usados para entrar no portal.</p></div>` : ""}`, "client");
+      const checkbox = document.querySelector('[name="createAccount"]');
+      if (checkbox) checkbox.addEventListener("change", () => {
+        $("#portalAccessFields").classList.toggle("hidden", !checkbox.checked);
+        const password = document.querySelector('[name="password"]');
+        password.required = checkbox.checked;
+        document.querySelector('[name="email"]').required = checkbox.checked;
+        if (!checkbox.checked) password.value = "";
+      });
+      return;
+    }
     if (action === "new-order") {
       vehicles = await api("/vehicles");
       if (!vehicles.length) throw new Error("Cadastre um veículo antes de criar uma ordem.");
@@ -277,6 +295,12 @@ $("#app").addEventListener("click", async (event) => {
         return;
       }
       orders = await api("/orders"); return orderDetail(n.targetOrderId);
+    }
+    if (action === "restock-list") return await showRestocks();
+    if (action === "restock-new") return form("Solicitar reposição", `<label>Peça<select name="itemId" required>${stock.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} · disponível ${escapeHtml(item.quantity - item.reservedQuantity)} ${escapeHtml(item.unit)}</option>`).join("")}</select></label><label>Quantidade<input name="quantity" type="number" min="0.01" max="9999999999.99" step="0.01" required></label><label>Observação<textarea name="note" maxlength="1000"></textarea></label>`, "restock-create");
+    if (action === "restock-resolve") {
+      if (!window.confirm(b.dataset.op === "receive" ? "Confirma o recebimento integral da quantidade solicitada? Ela será adicionada ao estoque." : "Confirma o cancelamento desta solicitação?")) return;
+      await api("/stock/restock-requests/" + id + "/" + b.dataset.op, request("POST")); return await showRestocks();
     }
     if (action === "open-kanban") return await show("kanban");
     if (action === "photos" || action === "portal-photos") return await showPhotos(id, action === "portal-photos");
@@ -334,6 +358,9 @@ $("#app").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#error").textContent = ""; const button = f.querySelector('[type="submit"]'); button.disabled = true;
   const d = Object.fromEntries(new FormData(f)); const action = f.dataset.submit;
   try {
+    if (action === "restock-create") {
+      await api("/stock/restock-requests", request("POST", {itemId:d.itemId, quantity:Number(d.quantity), note:d.note})); return await showRestocks();
+    }
     if (action === "photo-upload") {
       button.textContent = "Enviando…";
       const formData = new FormData(f); formData.set("visibleToClient", f.elements.visibleToClient.checked ? "true" : "false");
@@ -369,7 +396,13 @@ $("#app").addEventListener("submit", async (event) => {
     else if (action === "create-user") await api("/users", request("POST", d));
     else if (action === "update-user") await api("/users/" + d.id, request("PUT", { name: d.name, email: d.email, role: d.role }));
     else if (action === "reset-password") await api("/users/" + d.id + "/password", request("PATCH", { password: d.password }));
-    else if (action === "client") await api("/clients", request("POST", d));
+    else if (action === "client") {
+      const details = {name:d.name,phone:d.phone,email:d.email,plate:d.plate,vehicle:d.vehicle};
+      if (d.createAccount) {
+        if (!d.email || !d.password || d.password.length < 8) throw new Error("Informe e-mail e senha de pelo menos 8 caracteres para criar o acesso.");
+        await api("/clients/with-account", request("POST", {...details,password:d.password}));
+      } else await api("/clients", request("POST", details));
+    }
     else if (action === "order") await api("/orders", request("POST", d));
     else if (action === "budget") await api("/orders/" + d.id + "/budget", request("PATCH", { value: Number(d.value) }));
     else if (action === "checklist") await api("/orders/" + d.id + "/checklist", request("PATCH", { checklist: [...f.querySelectorAll('[name="check"]')].map((x) => x.checked) }));

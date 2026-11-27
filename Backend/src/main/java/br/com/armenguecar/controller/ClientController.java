@@ -17,12 +17,27 @@ import java.util.List;
 public class ClientController {
 
     private final ClientService clientService;
+    private final br.com.armenguecar.service.ClientRegistrationService registration;
 
-    public ClientController(ClientService clientService) {
-        this.clientService = clientService;
+    public ClientController(ClientService clientService, br.com.armenguecar.service.ClientRegistrationService registration) {
+        this.clientService = clientService; this.registration=registration;
     }
 
     public record LinkUserRequest(java.util.UUID userId) {}
+    public record ClientWithAccountRequest(
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=255) String name,
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=255) String phone,
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email @jakarta.validation.constraints.Size(max=255) String email,
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min=8,max=72) String password,
+        @jakarta.validation.constraints.Size(max=255) String plate,
+        @jakarta.validation.constraints.Size(max=255) String vehicle) {}
+    @PostMapping("/with-account")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public Client createWithAccount(@Valid @RequestBody ClientWithAccountRequest r, org.springframework.security.core.Authentication auth) {
+        var actor=(br.com.armenguecar.entity.User)auth.getPrincipal();
+        return registration.create(r.name(),r.phone(),r.email(),r.password(),r.plate(),r.vehicle(),actor.getId());
+    }
+
 
     @org.springframework.web.bind.annotation.PatchMapping("/{id}/user")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
